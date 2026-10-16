@@ -10,15 +10,23 @@
 [![Pytest Suite](https://img.shields.io/badge/Tests-183%20Passed-brightgreen.svg?logo=pytest&logoColor=white)](https://pytest.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-An enterprise-grade, distributed multi-state court automation, document intelligence, and real estate investment data pipeline.
+An enterprise-grade, distributed multi-state court automation, document intelligence, and full-spectrum real estate investment data pipeline.
 
-The platform autonomously crawls, extracts, and parses public court dockets across **all 21 New Jersey counties** and **15 Florida counties**, enriches legal filings with external real estate auction data (**SalesWeb**), market valuations (**Zillow Zestimates**), county recorder deeds, and deceased mortgagor records (**Obituary Microservice**), and synchronizes structured lifecycle state into a cloud **Supabase (PostgreSQL)** database backed by a live **Flask-SocketIO** operations dashboard.
+Rather than just scraping basic court listings, the platform builds a **complete 360° forensic real estate dossier** for every distressed property by autonomously aggregating, parsing, and synthesizing data across every critical dimension:
+- 📑 **Official Court Records & Docket PDFs**: Scans, downloads, and structures complaints, lis pendens, final judgments, and writs of execution.
+- 📜 **Official Land Records & Deeds**: Autonomous crawling of county recorder databases for warranty deeds, quitclaim deeds, instrument numbers, and chains of title.
+- 💰 **Loans, Liens & Unpaid Balances (SalesWeb & Dockets)**: Pinpoints primary mortgage balances, unpaid principal, default interest, second/subordinate mortgages, tax liens, municipal utility claims, and sheriff upset auction amounts.
+- 👤 **Homeowner & Party Profiling**: Identifies primary mortgagors, co-defendants, heirs, foreclosing plaintiffs, and service addresses.
+- 🏡 **Zillow Property & Valuation Telemetry**: Dynamic Zestimates, equity margin calculations, bedrooms, bathrooms, square footage, and listing/auction statuses.
+- 🕊️ **Deceased Owner & Obituary Intelligence**: Cross-references property owners against national death registries, scrapes full obituary texts, and extracts dates of death, surviving heirs/children, and probate administration signals.
+- 🗄️ **Centralized Relational Storage**: Normalizes all multi-source streams into an organized cloud **Supabase (PostgreSQL)** database with atomic state progression and real-time **Flask-SocketIO** dashboard telemetry.
 
 ---
 
 ## 📑 Table of Contents
 - [Technologies](#-technologies)
 - [System Architecture](#-system-architecture)
+- [The 360° Real Estate Dossier (What Gets Extracted)](#-the-360-real-estate-dossier-what-gets-extracted)
 - [Features](#-features)
 - [County Coverage](#-county-coverage)
 - [The Process ("The Cook"): Engineering Evolution](#-the-process-the-cook-engineering-evolution)
@@ -94,6 +102,52 @@ The platform autonomously crawls, extracts, and parses public court dockets acro
                                    │     - Local Excel Reports & Daily Artifacts      │
                                    └──────────────────────────────────────────────────┘
 ```
+
+---
+
+## 🎯 The 360° Real Estate Dossier: What Gets Extracted
+
+Instead of isolated, disjointed data points, the pipeline aggregates every facet of a real estate case into an all-inclusive, actionable property intelligence profile stored in **Supabase PostgreSQL**:
+
+```
+                       ┌────────────────────────────────────────────────────────┐
+                       │           THE COMPLETE 360° REAL ESTATE DOSSIER        │
+                       └───────────────────────────┬────────────────────────────┘
+                                                   │
+        ┌───────────────────┬──────────────────────┼──────────────────────┬───────────────────┐
+        ▼                   ▼                      ▼                      ▼                   ▼
+┌───────────────┐   ┌───────────────┐      ┌───────────────┐      ┌───────────────┐   ┌───────────────┐
+│ Court Records │   │ Deed History  │      │ Loans & Liens │      │ Property & Zp │   │ Obituary &    │
+│  & Legal Dockets  │ Land Records  │      │ SalesWeb Unpaid  │ Valuation Data│   │ Heirs Forensic│
+└───────┬───────┘   └───────┬───────┘      └───────┬───────┘      └───────┬───────┘   └───────┬───────┘
+        │                   │                      │                      │                   │
+        ▼                   ▼                      ▼                      ▼                   ▼
+ • Case Numbers      • Warranty Deeds       • Original Loans       • Zestimates        • Deceased Check
+ • Lis Pendens       • Quitclaim Deeds      • Unpaid Balances      • Equity Spreads    • Date of Death
+ • Final Judgments   • Instrument IDs       • 2nd/Junior Liens     • Beds/Baths/SqFt   • Full Obit Text
+ • Foreclosure Orders• Book & Page          • Tax/Municipal Liens  • Property Types    • Surviving Heirs
+ • Writs of Execution• Chain of Title       • Sheriff Upset Bids   • MLS & Auction Flag• Probate Signals
+        │                   │                      │                      │                   │
+        └───────────────────┴──────────────────────┼──────────────────────┴───────────────────┘
+                                                   │
+                                                   ▼
+                         ┌─────────────────────────────────────────────────────┐
+                         │      CENTRALIZED SUPABASE (POSTGRESQL) DATABASE     │
+                         │    - Relational Schemas & Foreign-Key Integrity     │
+                         │    - Atomic RPC Stored Procedures & Status Sync     │
+                         │    - High-Value Deal Flagging & Export to Excel     │
+                         └─────────────────────────────────────────────────────┘
+```
+
+| Intelligence Domain | Data Points Extracted | Source / Subsystem | Value to Investor / End User |
+|---|---|---|---|
+| **🏛️ Official Court Records** | Case number, filing date, court division, motion status, Foreclosure Complaint, Lis Pendens, Final Judgment amount, Orders to Vacate, Writs of Execution | County Court Clerk Portals (Selenium + Heuristic Regex Picker + OCR) | Determines legal standing, litigation trajectory, and imminent sheriff sale scheduling |
+| **📜 Deed & Land Records** | Recorded warranty/quitclaim deeds, grantor/grantee names, book & page numbers, recording dates, parcel IDs (APN), legal lot/block descriptions | County Official Records Crawlers (`deed_search/`) | Verifies true legal ownership, chain of title, and unrecorded deed transfers |
+| **💰 Loans, Liens & Unpaid Debt** | Original mortgage amounts, unpaid principal balances, default interest, second mortgages, HELOCs, federal/state tax liens, HOA assessment liens, sheriff upset prices | Court Judgment PDFs + **SalesWeb NJ** Parser (`browser/OP.py`) | Exposes total encumbrance stack to calculate exact equity margins and maximum allowable offers |
+| **👤 Homeowner & Debtor Profile** | Full borrower/mortgagor legal names, co-defendants, spouse parties, foreclosing lenders/servicers, service addresses, legal representation | Court Dockets & Pydantic Document Structuring | Enables targeted skip-tracing, direct outreach, and understanding who controls the title |
+| **🏡 Property Specs & Valuation** | Live Zestimates, estimated equity, property type (single-family, condo, multi-family), bedrooms, bathrooms, finished sqft, listing status | **Zillow API** via Apify Client (`update_zillow.py`) | Instantly gauges market value without manual comping to discard low-margin cases |
+| **🕊️ Deceased Owners & Obituaries** | Deceased confirmation, exact date of death, age at passing, funeral location, full obituary text, surviving heirs/children/relatives | Standalone **Obituary Microservice** (`obituary_api/`) | Identifies unprobated estate equity, off-market probate leads, and motivated surviving heirs |
+| **🗄️ Centralized Database Sync** | Normalized relational tables (`cases`, `parties`, `documents`, `deeds`, `liens`, `obituaries`), status rollups, and Excel reports | **Supabase (PostgreSQL)** + `openpyxl` / `pandas` | Provides a single source of truth for downstream investment workflows, underwriting, and CRM sync |
 
 ---
 
@@ -193,15 +247,20 @@ Determining true property ownership required searching county recorder and compt
 * *The Solution*: Fully decoupled deed operations into an independent asynchronous subsystem (`deed_search/`). Built an **ACID-compliant SQLite durable task queue** in Write-Ahead Logging (WAL) mode (`database/deed_queue_db.py`). The court scraper pushes deed tasks into the database; independent worker processes (`deed_worker.py`) poll, claim, process, and update records with automatic crash recovery.
 
 ### Phase 6: Forensic Discovery — Obituary & Heir Intelligence Microservice
-In foreclosure and probate investing, a major competitive edge is discovering whether a mortgagor is deceased before other market participants.
-* *The Engineering Challenge*: Cross-referencing hundreds of debtor names across multiple death record databases requires clean fuzzy string matching, geographic state filtering, and handling false positives.
-* *The Solution*: Engineered a standalone **Obituary Microservice** (`obituary_api/`). It features a dedicated REST client-server architecture, state-name normalization utilities (`state_normaliser.py`), and scrapers that search national obituary records to flag deceased owners, extract dates of death, and identify potential surviving heirs.
+In foreclosure and distressed property investing, discovering that a mortgagor is deceased before other market participants creates an immense competitive advantage. When a property owner passes away, the case often enters probate limbo, leaving behind motivated surviving heirs who may want to liquidate the asset before the foreclosure auction.
+* *The Engineering Challenge*: Matching debtor names against national death indexes requires resilient fuzzy string matching, handling variations (middle initials, married names), and normalizing geographic state data (`state_normaliser.py`) to avoid false positives.
+* *The Solution*: Engineered a standalone **Obituary Microservice** (`obituary_api/`). The service:
+  1. Accepts property owner names and geographic coordinates from the primary pipeline.
+  2. Scrapes national obituary repositories and death registries.
+  3. Extracts the **exact date of death, city of passing, and the full obituary narrative**.
+  4. Parses the obituary text to extract **surviving heirs, children, spouses, and probate clues**, linking this intelligence directly to the property's court docket record.
 
 ### Phase 7: Enterprise Productionization — Supabase, Docker Xvfb & Live Telemetry
-To run reliably 24/7 without developer intervention, the system needed cloud persistence, containerization, and observability.
-* *Cloud Persistence*: Migrated from flat Excel sheets and local JSON files to a relational **Supabase (PostgreSQL)** database. Authored custom PostgreSQL RPC stored procedures for atomic case updates and document relation sync.
-* *Dockerized Xvfb*: Containerized the application with Google Chrome running on an X Virtual Framebuffer (`DISPLAY=:99`), allowing headed browser runs in headless Linux environments without headless fingerprint detection.
-* *Operations Dashboard*: Built a real-time **Flask-SocketIO dashboard** (`app.py`) providing live progress bars, pipeline status rollups (`PENDING` → `RUNNING` → `SUCCESS` / `FAILED`), log streams, and remote process controls.
+To turn this collection of independent scrapers and parsers into an enterprise-ready system, all data streams had to be consolidated into an organized, centralized system of record.
+* *Centralized Relational Database*: Replaced brittle flat files and local JSON files with a unified **Supabase (PostgreSQL)** database. Designed a normalized schema connecting cases, court documents, property deeds, mortgage loans, tax liens, and obituary records via relational foreign keys.
+* *Atomic RPC Updates*: Authored custom PostgreSQL stored procedures (RPCs) to handle atomic case status progression (`PENDING` → `RUNNING` → `SUCCESS` / `FAILED`), preventing race conditions when multiple worker threads write simultaneously.
+* *Containerized Xvfb Environment*: Packaged the application into a Docker container running Google Chrome inside an X Virtual Framebuffer (`DISPLAY=:99`), allowing headed browser runs in headless Linux environments without triggering headless bot-detection heuristics.
+* *Real-Time Telemetry*: Built a **Flask-SocketIO web dashboard** (`app.py`) providing live progress bars, active thread states, log streams, and run controls (pause, resume, abort).
 
 ---
 
