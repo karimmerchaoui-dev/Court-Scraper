@@ -1,6 +1,6 @@
 # Court-Scraper
 
-A production-grade, distributed multi-state court automation and intelligence platform that extracts legal case documents across **all 21 New Jersey counties** and **15 Florida counties**, enriches them with property deeds and deceased-person records, and syncs full lifecycle state to a Supabase PostgreSQL database with a real-time web dashboard.
+A distributed multi-state court automation and intelligence platform that extracts legal case documents across **all 21 New Jersey counties** and **15 Florida counties**, enriches them with property deeds and deceased-person records, and syncs full lifecycle state to a Supabase PostgreSQL database with a real-time web dashboard.
 
 Built for high-volume, anti-bot-resilient scraping with **Selenium 4 + Undetected-Chromedriver**, containerized under **Docker + Xvfb virtual displays**, backed by an **ACID-compliant SQLite durable task queue**, and tested with a **180+ automated unit & integration test suite**.
 
