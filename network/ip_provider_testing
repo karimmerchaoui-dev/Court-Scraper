@@ -1,0 +1,67 @@
+import requests
+
+IP_SOURCES = [
+    {
+        "name": "ipinfo.io",
+        "url": "https://ipinfo.io/json",
+        "ip_field": "ip",
+        "country_field": "country"
+    },
+    {
+        "name": "ip-api.com",
+        "url": "http://ip-api.com/json",
+        "ip_field": "query",
+        "country_field": "countryCode"
+    },
+        {
+        "name": "myip.com",
+        "url": "https://api.myip.com",
+        "ip_field": "ip",
+        "country_field": "cc"
+    },
+    {
+        "name": "ipwho.is",
+        "url": "https://ipwho.is/",
+        "ip_field": "ip",
+        "country_field": "country_code"
+    },
+    {
+        "name": "freeipapi.com",
+        "url": "https://freeipapi.com/api/json",
+        "ip_field": "ipAddress",
+        "country_field": "countryCode"
+    },
+]
+
+def test_all_providers():
+    print("=" * 50)
+    print("Testing all IP providers")
+    print("=" * 50)
+    for source in IP_SOURCES:
+        print(f"\n🔍 Testing {source['name']} ({source['url']})")
+        try:
+            response = requests.get(source["url"], timeout=5)
+            print(f"   status  : {response.status_code}")
+            if response.status_code != 200:
+                print(f"   ❌ Non-200 response")
+                continue
+            data = response.json()
+            print(f"   raw json: {data}")
+            ip      = data.get(source["ip_field"], "")
+            country = data.get(source["country_field"], "")
+            print(f"   ip      : {ip or '❌ missing'}")
+            print(f"   country : {country or '❌ missing'}")
+            if ip and country:
+                print(f"   ✅ OK")
+            else:
+                print(f"   ⚠️ Response OK but fields missing — check field mapping")
+        except requests.exceptions.Timeout:
+            print(f"   ❌ Timed out")
+        except requests.exceptions.ConnectionError:
+            print(f"   ❌ Connection error")
+        except Exception as e:
+            print(f"   ❌ Unexpected error: {type(e).__name__}: {e}")
+    print("\n" + "=" * 50)
+
+if __name__ == "__main__":
+    test_all_providers()

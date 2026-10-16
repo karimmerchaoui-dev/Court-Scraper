@@ -1,0 +1,42 @@
+{
+  "complaint": {
+    "calls": 191,
+    "tokens_in": 4187126,
+    "tokens_out": 88607,
+    "cost": 3.625072,
+    "last_model": "claude-haiku-4-5-20251001",
+    "last_service": "anthropic"
+  },
+  "judgment": {
+    "calls": 228,
+    "tokens_in": 720248,
+    "tokens_out": 67091,
+    "cost": 0.813523,
+    "last_model": "claude-haiku-4-5-20251001",
+    "last_service": "anthropic"
+  },
+  "bankruptcy": {
+    "calls": 11,
+    "tokens_in": 44033,
+    "tokens_out": 2255,
+    "cost": 0.038262,
+    "last_model": "claude-haiku-4-5-20251001",
+    "last_service": "anthropic"
+  },
+  "deed": {
+    "calls": 0,
+    "tokens_in": 0,
+    "tokens_out": 0,
+    "cost": 0.0,
+    "last_model": "",
+    "last_service": ""
+  },
+  "obituary": {
+    "calls": 18,
+    "tokens_in": 83547,
+    "tokens_out": 3647,
+    "cost": 0.081426,
+    "last_model": "claude-haiku-4-5-20251001",
+    "last_service": "anthropic"
+  }
+}

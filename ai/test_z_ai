@@ -1,0 +1,30 @@
+from zai import ZaiClient
+
+# Initialize the client with your API key
+client = ZaiClient(api_key="b8fb8254522647fda35598d717c8dc78.OaHemcuhWx2Pp3ws")
+
+# Define your conversation history
+messages = [
+    {
+        "role": "system", 
+        "content": "You are a helpful and concise coding assistant."
+    },
+    {
+        "role": "user", 
+        "content": "Write a fast Python function to check if a number is prime."
+    }
+]
+
+# Call the chat API with streaming enabled
+response = client.chat.completions.create(
+    model="glm-4.7-flash",
+    messages=messages,
+    stream=True
+)
+
+# Print chunks as they arrive
+for chunk in response:
+    content = chunk.choices[0].delta.content
+    if content:
+        print(content, end="", flush=True)
+print()

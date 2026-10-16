@@ -1,0 +1,28 @@
+# Virtual environments & Python bytecode
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+
+# Git & IDE configs
+.git/
+.gitignore
+.idea/
+.vscode/
+
+# Scraped outputs, downloads & uploads (persisted via Docker volumes)
+downloads/
+output/
+deed_output/
+temp_downloads/
+uploads/
+*.xlsx
+*.csv
+*.zip
+
+# Logs & scratch
+*.log
+scratch/

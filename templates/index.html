@@ -1,0 +1,5583 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Court Downloader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;800&display=swap"
+    rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
+  <style>
+    /* ── Reset & Root ─────────────────────────────────────────────────────────── */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0d0f12;
+      --bg2: #13161b;
+      --bg3: #1a1e25;
+      --border: #252a34;
+      --border2: #2f3544;
+      --text: #c8d0dc;
+      --text-dim: #5a6478;
+      --text-hi: #eef1f7;
+      --accent: #00d4aa;
+      --accent2: #0099ff;
+      --danger: #ff4757;
+      --warn: #f59e0b;
+      --success: #22c55e;
+      --mono: 'JetBrains Mono', monospace;
+      --sans: 'Syne', sans-serif;
+      --radius: 6px;
+      --shadow: 0 4px 24px rgba(0, 0, 0, .5);
+    }
+
+    html,
+    body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.5;
+      overflow: hidden;
+    }
+
+    /* ── Layout ───────────────────────────────────────────────────────────────── */
+    #app {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      grid-template-columns: 340px 1fr;
+      grid-template-areas:
+        "header  header"
+        "sidebar main"
+        "footer  footer";
+      height: 100vh;
+      gap: 0;
+    }
+
+    /* ── Header ───────────────────────────────────────────────────────────────── */
+    #header {
+      grid-area: header;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 20px;
+      height: 52px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      z-index: 10;
+    }
+
+    .logo {
+      font-family: var(--sans);
+      font-weight: 800;
+      font-size: 16px;
+      color: var(--accent);
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      background: var(--accent);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #000;
+      font-size: 14px;
+    }
+
+    .header-status {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      display: inline-block;
+    }
+
+    .status-dot.running {
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+      animation: pulse 1.5s infinite;
+    }
+
+    .status-dot.error {
+      background: var(--danger);
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: .4;
+      }
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* ── Sidebar ──────────────────────────────────────────────────────────────── */
+    #sidebar {
+      grid-area: sidebar;
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      overflow-y: auto;
+    }
+
+    .sidebar-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-title {
+      font-family: var(--sans);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+    }
+
+    /* ── Form Controls ─────────────────────────────────────────────────────────── */
+    .form-row {
+      margin-bottom: 10px;
+    }
+
+    .form-row label {
+      display: block;
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+
+    input[type=text],
+    input[type=file],
+    select,
+    textarea {
+      width: 100%;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 7px 10px;
+      outline: none;
+      transition: border-color .15s;
+    }
+
+    input[type=text]:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--accent);
+    }
+
+    input[type=file] {
+      cursor: pointer;
+      padding: 5px 10px;
+    }
+
+    input[type=file]::file-selector-button {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 3px 8px;
+      cursor: pointer;
+      margin-right: 8px;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .checkbox-row input[type=checkbox] {
+      accent-color: var(--accent);
+      width: 14px;
+      height: 14px;
+    }
+
+    .checkbox-row label {
+      font-size: 12px;
+      color: var(--text);
+      margin: 0;
+      cursor: pointer;
+    }
+
+    select option {
+      background: var(--bg3);
+    }
+
+    /* ── File upload drop zone ──────────────────────────────────────────────────── */
+    .drop-zone {
+      border: 1.5px dashed var(--border2);
+      border-radius: var(--radius);
+      padding: 14px;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 11px;
+      cursor: pointer;
+      transition: all .2s;
+      position: relative;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.drag-over {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(0, 212, 170, .05);
+    }
+
+    .drop-zone input[type=file] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .drop-zone .dz-icon {
+      font-size: 22px;
+      margin-bottom: 4px;
+    }
+
+    .drop-zone .dz-name {
+      color: var(--accent);
+      font-size: 11px;
+      margin-top: 4px;
+      word-break: break-all;
+    }
+
+    /* ── Buttons ──────────────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border: none;
+      border-radius: var(--radius);
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 7px 14px;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+
+    .btn:disabled {
+      opacity: .35;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: #00f0c0;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: #ff6b7a;
+    }
+
+    .btn-warn {
+      background: var(--warn);
+      color: #000;
+    }
+
+    .btn-warn:hover:not(:disabled) {
+      background: #fbbf24;
+    }
+
+    .btn-ghost {
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      color: var(--text);
+    }
+
+    .btn-ghost:hover:not(:disabled) {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .btn-sm {
+      padding: 4px 9px;
+      font-size: 11px;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    /* ── Main panel ───────────────────────────────────────────────────────────── */
+    #main {
+      grid-area: main;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    /* ── Toolbar ─────────────────────────────────────────────────────────────── */
+    #toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    #search-box {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    #search-input {
+      width: 200px;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 5px 10px;
+      outline: none;
+      transition: border-color .15s, width .2s;
+    }
+
+    #search-input:focus {
+      border-color: var(--accent);
+      width: 260px;
+    }
+
+    .search-hint {
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    /* ── Case Table ───────────────────────────────────────────────────────────── */
+    #table-wrap {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    #case-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    #case-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 12px;
+      text-align: left;
+      font-family: var(--sans);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    #case-table thead th:hover {
+      color: var(--text);
+    }
+
+    #case-table tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .1s;
+      cursor: pointer;
+    }
+
+    #case-table tbody tr:hover {
+      background: rgba(255, 255, 255, .025);
+    }
+
+    #case-table tbody tr.selected {
+      background: rgba(0, 212, 170, .08);
+    }
+
+    #case-table tbody tr.highlighted {
+      background: rgba(0, 153, 255, .12);
+    }
+
+    #case-table td {
+      padding: 8px 12px;
+      font-size: 12px;
+      vertical-align: middle;
+      max-width: 260px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .status-badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+
+    /* ── Progress bar (inline in table) ──────────────────────────────────────── */
+    .mini-progress {
+      width: 100%;
+      max-width: 180px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    .mini-progress-bar {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width .3s;
+    }
+
+    /* ── Log panel ─────────────────────────────────────────────────────────────── */
+    #log-panel {
+      height: 200px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    #log-header {
+      display: flex;
+      align-items: center;
+      padding: 6px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg3);
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    #log-title {
+      font-family: var(--sans);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    #log-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 12px;
+      font-size: 11.5px;
+      font-family: var(--mono);
+      line-height: 1.6;
+    }
+
+    .log-line {
+      color: var(--text-dim);
+    }
+
+    .log-line.info {
+      color: var(--text);
+    }
+
+    .log-line.success {
+      color: var(--success);
+    }
+
+    .log-line.error {
+      color: var(--danger);
+    }
+
+    .log-line.warn {
+      color: var(--warn);
+    }
+
+    /* ── Footer ───────────────────────────────────────────────────────────────── */
+    #footer {
+      grid-area: footer;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 20px;
+      height: 36px;
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    #global-progress-wrap {
+      flex: 1;
+      max-width: 300px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    #global-progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 2px;
+      width: 0%;
+      transition: width .4s;
+    }
+
+    #status-text-footer {
+      flex: 1;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    /* ── Modal ───────────────────────────────────────────────────────────────── */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      width: 420px;
+      box-shadow: var(--shadow);
+      animation: modal-in .15s ease;
+    }
+
+    @keyframes modal-in {
+      from {
+        transform: translateY(-12px);
+        opacity: 0;
+      }
+
+      to {
+        transform: none;
+        opacity: 1;
+      }
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--text-hi);
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-size: 18px;
+      cursor: pointer;
+      line-height: 1;
+      transition: color .15s;
+    }
+
+    .modal-close:hover {
+      color: var(--danger);
+    }
+
+    .modal-body {
+      padding: 20px;
+    }
+
+    .modal-footer {
+      padding: 12px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .error-msg {
+      color: var(--danger);
+      font-size: 11px;
+      margin-top: 6px;
+      min-height: 16px;
+    }
+
+    /* ── Toast ───────────────────────────────────────────────────────────────── */
+    #toast-container {
+      position: fixed;
+      bottom: 50px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 200;
+    }
+
+    .toast {
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      font-size: 12px;
+      color: var(--text);
+      box-shadow: var(--shadow);
+      animation: toast-in .2s ease;
+      max-width: 300px;
+    }
+
+    .toast.success {
+      border-left: 3px solid var(--success);
+    }
+
+    .toast.error {
+      border-left: 3px solid var(--danger);
+    }
+
+    .toast.warn {
+      border-left: 3px solid var(--warn);
+    }
+
+    @keyframes toast-in {
+      from {
+        transform: translateX(20px);
+        opacity: 0;
+      }
+
+      to {
+        transform: none;
+        opacity: 1;
+      }
+    }
+
+    /* ── Scrollbars ──────────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border2);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3f4757;
+    }
+
+    /* ── Empty state ─────────────────────────────────────────────────────────── */
+    #empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-dim);
+      gap: 8px;
+      padding: 40px;
+    }
+
+    #empty-state .es-icon {
+      font-size: 36px;
+    }
+
+    #empty-state .es-text {
+      font-size: 12px;
+      text-align: center;
+    }
+
+    /* ── Resize handle for log ───────────────────────────────────────────────── */
+    #log-resize {
+      height: 4px;
+      cursor: row-resize;
+      background: var(--border);
+      flex-shrink: 0;
+      transition: background .15s;
+    }
+
+    #log-resize:hover {
+      background: var(--accent);
+    }
+
+    /* ── Inline Report Summary Panel ─────────────────────────────────────────── */
+    #summary-panel {
+      display: none;
+      flex-direction: column;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      max-height: 280px;
+      overflow: hidden;
+      animation: slide-down .25s ease;
+    }
+
+    @keyframes slide-down {
+      from {
+        max-height: 0;
+        opacity: 0;
+      }
+
+      to {
+        max-height: 280px;
+        opacity: 1;
+      }
+    }
+
+    #summary-panel.open {
+      display: flex;
+    }
+
+    #summary-panel-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    #summary-panel-title {
+      font-family: var(--sans);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    /* Stat pills */
+    .summary-stats {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .stat-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+    }
+
+    .stat-pill .stat-val {
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    /* Mini case cards */
+    #summary-cards {
+      display: flex;
+      gap: 8px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 10px 14px;
+      flex: 1;
+    }
+
+    #summary-cards::-webkit-scrollbar {
+      height: 4px;
+    }
+
+    .case-card {
+      flex-shrink: 0;
+      width: 170px;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: border-color .15s;
+      cursor: default;
+    }
+
+    .case-card:hover {
+      border-color: var(--accent);
+    }
+
+    .case-card .cc-id {
+      font-weight: 700;
+      font-size: 12px;
+      color: var(--text-hi);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .case-card .cc-county {
+      color: var(--text-dim);
+      font-size: 10px;
+    }
+
+    .case-card .cc-status {
+      font-size: 11px;
+      font-weight: 500;
+      margin-top: 2px;
+    }
+
+    .case-card .cc-files {
+      color: var(--text-dim);
+      font-size: 10px;
+      margin-top: auto;
+      padding-top: 6px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── Case Log + Screenshot Overlay ────────────────────────── */
+    #case-log-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      z-index: 300;
+      flex-direction: column;
+    }
+
+    #case-log-overlay.open {
+      display: flex;
+    }
+
+    /* ── N8N Workflow Pipeline Styles ────────────────────────── */
+    #main-pipeline-section {
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    #main-pipeline-section.collapsed #main-n8n-canvas-wrap {
+      display: none;
+    }
+
+    #main-pipeline-header {
+      display: flex;
+      align-items: center;
+      padding: 7px 20px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      gap: 14px;
+      font-size: 11px;
+    }
+
+    .pipeline-title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pipeline-badge {
+      background: rgba(0, 212, 170, 0.12);
+      color: var(--accent);
+      border: 1px solid rgba(0, 212, 170, 0.3);
+      padding: 1px 7px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .pipeline-title {
+      font-family: var(--sans);
+      font-weight: 700;
+      color: var(--text-hi);
+      font-size: 12px;
+    }
+
+    .pipeline-case-label {
+      color: var(--accent2);
+      font-family: var(--mono);
+      font-weight: 600;
+      background: rgba(0, 153, 255, 0.1);
+      border: 1px solid rgba(0, 153, 255, 0.25);
+      padding: 1px 7px;
+      border-radius: 4px;
+      font-size: 10.5px;
+    }
+
+    .pipeline-status-label {
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 10px;
+      background: rgba(0, 212, 170, 0.08);
+      border: 1px solid rgba(0, 212, 170, 0.2);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    .pipeline-cost-label {
+      color: #38bdf8;
+      font-family: var(--mono);
+      font-size: 10.5px;
+      font-weight: 700;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      padding: 1px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .pipeline-cost-label:hover {
+      background: rgba(56, 189, 248, 0.22);
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .pipeline-legend {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-left: auto;
+      font-size: 10.5px;
+      color: var(--text-dim);
+    }
+
+    .leg-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .leg-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #475569;
+    }
+
+    .leg-dot.pending {
+      background: #64748b;
+    }
+
+    .leg-dot.running {
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+    }
+
+    .leg-dot.success {
+      background: var(--success);
+    }
+
+    .leg-dot.retrying {
+      background: var(--warn);
+    }
+
+    .leg-dot.failed {
+      background: var(--danger);
+    }
+
+    .leg-dot.skipped {
+      background: #475569;
+      opacity: 0.5;
+    }
+
+    #main-pipeline-toggle {
+      font-size: 10.5px;
+      padding: 2px 8px;
+      cursor: pointer;
+    }
+
+    #main-n8n-canvas-wrap {
+      position: relative;
+      background-color: #0b0d11;
+      background-image: radial-gradient(circle, #1e2430 1.5px, transparent 1.5px);
+      background-size: 18px 18px;
+      overflow-x: auto;
+      overflow-y: auto;
+      padding: 24px 30px;
+      min-height: 480px;
+      max-height: 560px;
+      display: flex;
+      align-items: center;
+    }
+
+    #main-n8n-canvas-wrap::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    #main-n8n-canvas-wrap::-webkit-scrollbar-track {
+      background: var(--bg2);
+    }
+
+    #main-n8n-canvas-wrap::-webkit-scrollbar-thumb {
+      background: var(--border2);
+      border-radius: 3px;
+    }
+
+    #main-n8n-svg-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    #main-n8n-nodes-stage {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 68px;
+      min-width: max-content;
+      padding: 16px 22px;
+    }
+
+    .n8n-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .n8n-col.parallel-col {
+      border: 1px dashed rgba(0, 212, 170, 0.35);
+      border-radius: 12px;
+      padding: 14px 16px 16px 16px;
+      background: rgba(0, 212, 170, 0.025);
+      box-shadow: inset 0 0 18px rgba(0, 212, 170, 0.03);
+    }
+
+    .parallel-frame-header {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.6px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      text-transform: uppercase;
+      opacity: 0.95;
+    }
+
+    .parallel-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .n8n-node {
+      width: 215px;
+      min-height: 86px;
+      background: linear-gradient(180deg, #161a22 0%, #11141b 100%);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+      user-select: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .n8n-node:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 16px rgba(0, 0, 0, 0.6);
+      border-color: #3b4252;
+    }
+
+    .n8n-node.running {
+      border-color: var(--accent);
+      box-shadow: 0 0 16px rgba(0, 212, 170, 0.45);
+      animation: n8n-pulse 1.6s infinite;
+    }
+
+    .n8n-node.success {
+      border-color: rgba(34, 197, 94, 0.85);
+      box-shadow: 0 0 10px rgba(34, 197, 94, 0.22);
+    }
+
+    .n8n-node.failed {
+      border-color: var(--danger);
+      box-shadow: 0 0 12px rgba(255, 71, 87, 0.35);
+    }
+
+    .n8n-node.retrying {
+      border-color: var(--warn);
+      box-shadow: 0 0 12px rgba(245, 158, 11, 0.35);
+    }
+
+    .n8n-node.skipped {
+      border-style: dashed;
+      border-color: #475569;
+      opacity: 0.55;
+    }
+
+    .node-port {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #0f1217;
+      border: 2px solid #475569;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 4;
+      transition: all 0.2s ease;
+    }
+
+    .node-port.in {
+      left: -5.5px;
+    }
+
+    .node-port.out {
+      right: -5.5px;
+    }
+
+    .n8n-node.running .node-port {
+      border-color: var(--accent);
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+    }
+
+    .n8n-node.success .node-port {
+      border-color: var(--success);
+      background: var(--success);
+    }
+
+    .n8n-node.failed .node-port {
+      border-color: var(--danger);
+      background: var(--danger);
+    }
+
+    .n8n-node-header {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .node-icon-box {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.07);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .node-title-box {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex: 1;
+    }
+
+    .node-name {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-hi);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.25;
+    }
+
+    .node-sub {
+      font-size: 10px;
+      color: var(--text-dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 1px;
+    }
+
+    .n8n-node-footer {
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .node-status-badge {
+      font-size: 8.5px;
+      font-family: var(--mono);
+      text-transform: uppercase;
+      padding: 1px 6px;
+      border-radius: 8px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
+    .node-status-badge.pending {
+      background: rgba(148, 163, 184, 0.08);
+      color: #64748b;
+    }
+
+    .node-status-badge.running {
+      background: rgba(0, 212, 170, 0.15);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+
+    .node-status-badge.success {
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(34, 197, 94, 0.5);
+    }
+
+    .node-status-badge.failed {
+      background: rgba(255, 71, 87, 0.15);
+      color: var(--danger);
+      border: 1px solid rgba(255, 71, 87, 0.5);
+    }
+
+    .node-status-badge.retrying {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--warn);
+      border: 1px solid rgba(245, 158, 11, 0.5);
+    }
+
+    .node-status-badge.skipped {
+      background: rgba(100, 116, 139, 0.1);
+      color: var(--text-dim);
+    }
+
+    .node-gear-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 11.5px;
+      cursor: pointer;
+      padding: 1px 4px;
+      border-radius: 3px;
+      transition: all 0.15s ease;
+      line-height: 1;
+    }
+
+    .node-gear-btn:hover {
+      color: var(--accent);
+      background: rgba(0, 212, 170, 0.18);
+      transform: scale(1.15);
+    }
+
+    .node-ai-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+      padding: 3px 0 2px 0;
+    }
+
+    .ai-chip {
+      font-size: 8.5px;
+      font-family: var(--mono);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-hi);
+      padding: 1px 4px;
+      border-radius: 3px;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .ai-chip:hover {
+      border-color: rgba(0, 212, 170, 0.4);
+      background: rgba(0, 212, 170, 0.08);
+    }
+
+    .node-cost-badge {
+      font-size: 8.5px;
+      font-family: var(--mono);
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      padding: 1px 5px;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      margin-left: auto;
+      font-weight: 700;
+    }
+
+    .node-cost-badge:hover {
+      background: rgba(56, 189, 248, 0.25);
+      box-shadow: 0 0 6px rgba(56, 189, 248, 0.4);
+    }
+
+    /* ── n8n Modals & Overlays ── */
+    .n8n-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.78);
+      backdrop-filter: blur(6px);
+      z-index: 10000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .n8n-modal-overlay.open {
+      display: flex;
+    }
+
+    .n8n-modal-card {
+      background: #11141c;
+      border: 1px solid rgba(0, 212, 170, 0.35);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85), 0 0 25px rgba(0, 212, 170, 0.15);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 540px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .n8n-modal-card.wide {
+      max-width: 820px;
+    }
+
+    @keyframes modalPop {
+      0% {
+        opacity: 0;
+        transform: scale(0.95);
+      }
+
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .n8n-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      background: #151924;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .n8n-modal-title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .n8n-modal-icon {
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .n8n-modal-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-hi);
+    }
+
+    .n8n-modal-subtitle {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    .n8n-modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 16px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .n8n-modal-close:hover {
+      color: var(--danger);
+      background: rgba(255, 71, 87, 0.1);
+    }
+
+    .n8n-modal-body {
+      padding: 18px 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .n8n-modal-footer {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 12px 20px;
+      background: #151924;
+      border-top: 1px solid var(--border);
+    }
+
+    .node-sub-tabs {
+      display: flex;
+      gap: 6px;
+      background: #0d0f14;
+      padding: 4px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .node-sub-tab {
+      flex: 1;
+      font-size: 11px;
+      padding: 6px 8px;
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    .node-sub-tab:hover {
+      color: var(--text-hi);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .node-sub-tab.active {
+      background: rgba(0, 212, 170, 0.18);
+      color: var(--accent);
+      box-shadow: inset 0 0 6px rgba(0, 212, 170, 0.2);
+    }
+
+    .n8n-param-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .n8n-param-label {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-hi);
+    }
+
+    .n8n-param-hint {
+      font-size: 10px;
+      color: var(--text-dim);
+      font-weight: 400;
+    }
+
+    .n8n-param-select,
+    .n8n-param-input {
+      width: 100%;
+      background: #0a0c10;
+      border: 1px solid var(--border);
+      color: var(--text-hi);
+      font-size: 12px;
+      font-family: var(--mono);
+      padding: 7px 10px;
+      border-radius: 5px;
+      transition: border-color 0.15s ease;
+    }
+
+    .n8n-param-select:focus,
+    .n8n-param-input:focus {
+      border-color: var(--accent);
+      outline: none;
+    }
+
+    .n8n-input-with-eye {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .n8n-input-with-eye .eye-toggle-btn {
+      position: absolute;
+      right: 8px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      opacity: 0.7;
+    }
+
+    .n8n-input-with-eye .eye-toggle-btn:hover {
+      opacity: 1;
+    }
+
+    .model-quick-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 4px;
+    }
+
+    .quick-chip {
+      font-size: 9.5px;
+      font-family: var(--mono);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-dim);
+      padding: 2px 6px;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .quick-chip:hover {
+      background: rgba(0, 212, 170, 0.15);
+      color: var(--accent);
+      border-color: rgba(0, 212, 170, 0.35);
+    }
+
+    .n8n-task-stats-card {
+      background: #0b0e14;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-top: 4px;
+    }
+
+    .stats-card-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stats-card-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .stat-mini-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .stat-mini-label {
+      font-size: 9.5px;
+      color: var(--text-dim);
+    }
+
+    .stat-mini-val {
+      font-size: 12px;
+      font-family: var(--mono);
+      font-weight: 700;
+      color: var(--text-hi);
+    }
+
+    .stat-mini-val.text-accent {
+      color: var(--accent);
+    }
+
+    /* ── Cost Breakdown Modal Styles ── */
+    .cost-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .cost-kpi-card {
+      background: #0d1017;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .cost-kpi-card.highlight {
+      border-color: rgba(0, 212, 170, 0.4);
+      background: rgba(0, 212, 170, 0.05);
+      box-shadow: inset 0 0 15px rgba(0, 212, 170, 0.04);
+    }
+
+    .kpi-label {
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: var(--text-dim);
+    }
+
+    .kpi-value {
+      font-size: 20px;
+      font-family: var(--mono);
+      font-weight: 800;
+      color: var(--text-hi);
+    }
+
+    .cost-kpi-card.highlight .kpi-value {
+      color: var(--accent);
+    }
+
+    .kpi-sub {
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    .cost-table-wrap {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      background: #0a0c10;
+    }
+
+    .cost-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11.5px;
+    }
+
+    .cost-table th {
+      background: #141822;
+      padding: 8px 12px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-dim);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .cost-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text-hi);
+      font-family: var(--mono);
+    }
+
+    .cost-table tbody tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .cost-total-row {
+      background: #141822;
+      font-weight: 700;
+      border-top: 2px solid var(--border);
+    }
+
+    @keyframes n8n-pulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(0, 212, 170, 0.45);
+      }
+
+      70% {
+        box-shadow: 0 0 0 8px rgba(0, 212, 170, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(0, 212, 170, 0);
+      }
+    }
+
+    @keyframes n8n-flow {
+      from {
+        stroke-dashoffset: 20;
+      }
+
+      to {
+        stroke-dashoffset: 0;
+      }
+    }
+
+    .n8n-wire {
+      fill: none;
+      stroke-linecap: round;
+      transition: stroke 0.3s ease;
+    }
+
+    .n8n-wire.n8n-wire-pending {
+      stroke: #252a34;
+      stroke-width: 2px;
+      stroke-dasharray: 4 4;
+    }
+
+    .n8n-wire.n8n-wire-ready {
+      stroke: #333d4d;
+      stroke-width: 2px;
+    }
+
+    .n8n-wire.n8n-wire-running {
+      stroke: var(--accent);
+      stroke-width: 2.5px;
+      stroke-dasharray: 6 4;
+      animation: n8n-flow 0.8s linear infinite;
+    }
+
+    .n8n-wire.n8n-wire-success {
+      stroke: var(--success);
+      stroke-width: 2.5px;
+    }
+
+    .n8n-wire.n8n-wire-failed {
+      stroke: var(--danger);
+      stroke-width: 2.5px;
+    }
+
+    /* ── Table Mini Pipeline Styles ────────────────────────── */
+    .cell-pipeline-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      cursor: pointer;
+      padding: 2px 0;
+    }
+
+    .cell-pipeline-wrap:hover .mini-pipeline-trail {
+      opacity: 1;
+    }
+
+    .mini-pipeline-trail {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      font-size: 11px;
+      opacity: 0.9;
+    }
+
+    .m-step {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 17px;
+      height: 17px;
+      border-radius: 4px;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      font-size: 9.5px;
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+
+    .m-step.running {
+      border-color: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+      animation: n8n-pulse 1.3s infinite;
+    }
+
+    .m-step.success {
+      border-color: var(--success);
+      background: rgba(34, 197, 94, 0.15);
+    }
+
+    .m-step.failed {
+      border-color: var(--danger);
+      background: rgba(255, 71, 87, 0.15);
+    }
+
+    .m-step.retrying {
+      border-color: var(--warn);
+      background: rgba(245, 158, 11, 0.15);
+    }
+
+    .m-step.skipped {
+      opacity: 0.35;
+    }
+
+    .m-sep {
+      color: var(--text-dim);
+      font-size: 9px;
+      margin: 0 1px;
+    }
+
+    .m-parallel-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 1px;
+      padding: 1px 2px;
+      border-radius: 4px;
+      background: rgba(0, 212, 170, 0.05);
+      border: 1px dashed rgba(0, 212, 170, 0.35);
+    }
+
+    .m-sub {
+      font-size: 9px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 15px;
+      height: 15px;
+      border-radius: 3px;
+      transition: all 0.15s ease;
+    }
+
+    .m-sub.running {
+      box-shadow: 0 0 5px var(--accent);
+      background: rgba(0, 212, 170, 0.2);
+    }
+
+    .m-sub.success {
+      background: rgba(34, 197, 94, 0.2);
+    }
+
+    .m-sub.failed {
+      background: rgba(255, 71, 87, 0.2);
+    }
+
+    .m-sub.skipped {
+      opacity: 0.35;
+    }
+
+    .btn-flow-col {
+      color: var(--accent);
+      border-color: rgba(0, 212, 170, 0.4);
+      font-weight: 600;
+      font-size: 11px;
+    }
+
+    .btn-flow-col:hover {
+      background: rgba(0, 212, 170, 0.15);
+      border-color: var(--accent);
+    }
+
+    #clo-header {
+      display: flex;
+      align-items: center;
+      padding: 10px 20px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    #clo-title {
+      font-family: var(--sans);
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--accent);
+    }
+
+    #clo-close {
+      margin-left: auto;
+      background: var(--danger);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 5px 14px;
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    #clo-search-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    #clo-search {
+      width: 220px;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 5px 10px;
+      outline: none;
+    }
+
+    #clo-search:focus {
+      border-color: var(--accent);
+    }
+
+    #clo-search-count {
+      font-size: 11px;
+      color: var(--text-dim);
+      min-width: 60px;
+    }
+
+    #clo-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    #clo-logs {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+      font-family: var(--mono);
+      font-size: 11.5px;
+      line-height: 1.65;
+      border-right: 1px solid var(--border);
+    }
+
+    #clo-logs .log-line {
+      color: var(--text-dim);
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    #clo-logs .log-line.info {
+      color: var(--text);
+    }
+
+    #clo-logs .log-line.success {
+      color: var(--success);
+    }
+
+    #clo-logs .log-line.error {
+      color: var(--danger);
+    }
+
+    #clo-logs .log-line.warn {
+      color: var(--warn);
+    }
+
+    #clo-logs .log-line.search-hidden {
+      display: none;
+    }
+
+    #clo-logs .log-line .search-match {
+      background: rgba(0, 212, 170, .3);
+      border-radius: 2px;
+      padding: 0 1px;
+    }
+
+    #clo-screenshot-pane {
+      width: 320px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg2);
+      border-left: 1px solid var(--border);
+    }
+
+    #clo-screenshot-pane .pane-title {
+      padding: 8px 14px;
+      background: var(--bg3);
+      font-family: var(--sans);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    #clo-timeline {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .timeline-thumb {
+      cursor: pointer;
+      border: 2px solid transparent;
+      border-radius: 4px;
+      overflow: hidden;
+      transition: border-color .15s;
+      position: relative;
+    }
+
+    .timeline-thumb:hover,
+    .timeline-thumb.active {
+      border-color: var(--accent);
+    }
+
+    .timeline-thumb img {
+      width: 100%;
+      display: block;
+      background: #000;
+    }
+
+    .timeline-thumb .ts-label {
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      font-size: 9px;
+      font-family: var(--mono);
+      color: #fff;
+      background: rgba(0, 0, 0, .7);
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+
+    #clo-preview {
+      width: 100%;
+      max-height: 200px;
+      object-fit: contain;
+      background: #000;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    #clo-no-screenshot {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+
+    /* ── Driver Monitor Grid ──────────────────────────────────── */
+    #driver-monitor-section {
+      border-top: 1px solid var(--border);
+      background: var(--bg2);
+    }
+
+    #driver-monitor-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    #driver-monitor-header:hover {
+      background: var(--bg3);
+    }
+
+    #driver-monitor-title {
+      font-family: var(--sans);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    #driver-monitor-toggle {
+      font-size: 10px;
+      color: var(--text-dim);
+      transition: transform .2s;
+    }
+
+    #driver-monitor-body {
+      display: none;
+      padding: 10px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    #driver-monitor-body.open {
+      display: flex;
+    }
+
+    .driver-card {
+      width: 280px;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .driver-card img {
+      width: 100%;
+      height: 160px;
+      object-fit: cover;
+      background: #111;
+      cursor: pointer;
+    }
+
+    .driver-card-info {
+      padding: 8px 10px;
+      font-size: 11px;
+      font-family: var(--mono);
+      color: var(--text-dim);
+    }
+
+    .driver-card-info .dc-case {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .btn-logs-col {
+      background: none;
+      border: 1px solid var(--border2);
+      color: var(--text-dim);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: var(--mono);
+      transition: all .15s;
+    }
+
+    .btn-logs-col:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+
+    <!-- ── HEADER ─────────────────────────────────────────────────────────── -->
+    <header id="header">
+      <div class="logo">
+        <div class="logo-icon">⚖</div>
+        Court Downloader
+      </div>
+      <div class="header-status">
+        <span class="status-dot" id="conn-dot"></span>
+        <span id="conn-label">Connecting…</span>
+        &nbsp;·&nbsp;
+        <span id="queue-count">0 in queue</span>
+      </div>
+    </header>
+
+    <!-- ── SIDEBAR ────────────────────────────────────────────────────────── -->
+    <aside id="sidebar">
+
+      <!-- Input file -->
+      <!-- Batch Name -->
+      <div class="sidebar-section">
+        <div class="section-title">Batch Name</div>
+        <div class="form-row">
+          <input type="text" id="batch-name" placeholder="" />
+          <div style="font-size:10px;color:var(--text-dim);margin-top:4px">
+            Used to identify this batch in reports and database
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btn-set-batch-name">Set Batch Name</button>
+      </div>
+      <div class="sidebar-section">
+        <div class="section-title">Input File</div>
+        <div class="form-row">
+          <div class="drop-zone" id="drop-zone">
+            <input type="file" id="file-input" accept=".xlsx,.xls" />
+            <div class="dz-icon">📄</div>
+            <div>Drop Excel file or click to browse</div>
+            <div class="dz-name" id="dz-name"></div>
+          </div>
+        </div>
+      </div>
+      <!-- Manual Range Input -->
+      <div class="sidebar-section">
+        <div class="section-title">Case Range</div>
+        <div class="form-row">
+          <label>Year</label>
+          <input type="text" id="range-year" placeholder="e.g. 2026" maxlength="4" />
+        </div>
+        <div class="form-row">
+          <label>From</label>
+          <input type="text" id="range-from" placeholder="e.g. 1" />
+        </div>
+        <div class="form-row">
+          <label>To</label>
+          <input type="text" id="range-to" placeholder="e.g. 5000" />
+        </div>
+        <div class="form-row">
+          <label>County / State</label>
+          <select id="range-county">
+            <option>New Jersey</option>
+            <option>Miami</option>
+            <option>Orange</option>
+            <option>Broward</option>
+            <option>Lee</option>
+            <option>Palm Beach</option>
+            <option>Duval</option>
+            <option>Volusia</option>
+            <option>Brevard</option>
+            <option>Polk</option>
+            <option>Seminole</option>
+            <option>Sarasota</option>
+            <option>Manatee</option>
+            <option>Osceola</option>
+          </select>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btn-load-range">Load Range</button>
+        <div id="range-status" style="font-size:11px;color:var(--text-dim);margin-top:6px"></div>
+      </div>
+      <!-- Output folder -->
+      <div class="sidebar-section">
+        <div class="section-title">Output Folder</div>
+        <div class="form-row">
+          <input type="text" id="output-folder" placeholder="/path/to/output/folder" />
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btn-set-output">Set Folder</button>
+      </div>
+
+      <!-- Keywords -->
+      <div class="sidebar-section">
+        <div class="section-title">Keywords</div>
+        <div class="form-row">
+          <label>Match keywords (comma separated)</label>
+          <input type="text" id="keywords" placeholder="motion, complaint, order" />
+        </div>
+        <div class="form-row">
+          <label>Unwanted keywords</label>
+          <input type="text" id="unwanted-keywords" placeholder="duplicate, draft" />
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="headless-mode" />
+          <label for="headless-mode">Headless Mode</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="skip-closed-cases" checked />
+          <label for="skip-closed-cases">Skip Closed Cases</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="skip-business" checked />
+          <label for="skip-business">Skip Business Cases</label>
+        </div>
+        <div class="form-row">
+          <label>Workers (1–8)</label>
+          <select id="max-workers">
+            <option>1</option>
+            <option>2</option>
+            <option selected>3</option>
+            <option>4</option>
+            <option>5</option>
+            <option>6</option>
+            <option>7</option>
+            <option>8</option>
+          </select>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btn-save-settings">Save Settings</button>
+      </div>
+
+      <!-- AI / LLM Settings -->
+      <div class="sidebar-section">
+        <div class="section-title">AI / LLM Settings (Deed & Obit)</div>
+        <div class="form-row">
+          <label>Provider / Service</label>
+          <select id="llm-service">
+            <option value="groq">Groq</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="google">Google (Gemini)</option>
+            <option value="anthropic">Anthropic</option>
+            <option value="freellmapi">FreeLLMAPI (Logfare)</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>API Key</label>
+          <input type="password" id="llm-api-key" placeholder="API Key…" autocomplete="off" />
+        </div>
+        <div class="form-row">
+          <label>Model Name</label>
+          <input type="text" id="llm-model" placeholder="e.g. openai/gpt-oss-120b, claude-3-5-haiku" />
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btn-save-llm-settings"
+          style="margin-top:6px;width:100%;color:var(--accent);border-color:var(--accent)">💾 Save AI Settings</button>
+      </div>
+
+      <!-- Controls -->
+      <div class="sidebar-section">
+        <div class="section-title">Controls</div>
+        <div class="btn-group">
+          <button class="btn btn-primary" id="btn-start">▶ Start</button>
+          <button class="btn btn-danger" id="btn-stop" disabled>⏹ Stop</button>
+          <button class="btn btn-warn" id="btn-skip">⏭ Skip</button>
+        </div>
+        <button class="btn btn-warn btn-sm" id="btn-restart-app-side"
+          style="margin-top:8px;width:100%;color:#fff;background:linear-gradient(135deg, #f59e0b, #d97706);border-color:#f59e0b;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;"
+          title="Shut down the entire app, browsers and tasks, and rerun main.py fresh">
+          ⚡ Rerun Application
+        </button>
+      </div>
+
+      <!-- spacer -->
+      <div style="flex:1"></div>
+
+      <!-- WiFi / connection hint -->
+      <div class="sidebar-section" style="padding:10px 16px">
+        <div style="font-size:11px;color:var(--text-dim)">
+          Connected clients share live state via WebSocket.
+          Open <strong style="color:var(--accent)">http://&lt;server-ip&gt;:5000</strong> from any device on the same
+          network.
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── MAIN ───────────────────────────────────────────────────────────── -->
+    <main id="main">
+
+      <!-- Toolbar -->
+      <div id="toolbar">
+        <button class="btn btn-ghost btn-sm" id="btn-add-case">➕ Add Case</button>
+        <button class="btn btn-ghost btn-sm" id="btn-remove-selected"
+          style="color:var(--danger);border-color:var(--danger)">🗑 Remove Selected</button>
+        <button class="btn btn-ghost btn-sm" id="btn-clear-cases">Clear All</button>
+        <button class="btn btn-danger btn-sm" id="btn-reset-all" style="color:#fff;border-color:var(--danger)"
+          title="Remove all cases and reset everything">
+          🔄 Reset All
+        </button>
+        <button class="btn btn-warn btn-sm" id="btn-restart-app"
+          style="color:#fff;background:linear-gradient(135deg, #f59e0b, #d97706);border-color:#f59e0b;font-weight:600;display:inline-flex;align-items:center;gap:4px;"
+          title="Shut down the whole app, terminate scrapers, and rerun main.py fresh">
+          ⚡ Rerun App
+        </button>
+        <button class="btn btn-ghost btn-sm" id="btn-view-report" style="color:var(--accent);border-color:var(--accent)"
+          disabled>📊 View Report</button>
+        <button class="btn btn-ghost btn-sm" id="btn-download-batch"
+          style="display:none;color:var(--success);border-color:var(--success)"
+          title="Download the processed batch folder as a ZIP">
+          ⬇ Download Batch Folder
+        </button>
+        <button class="btn btn-ghost btn-sm" id="btn-cost-analytics"
+          style="color:#38bdf8;border-color:rgba(56,189,248,0.4)" title="View LLM Token Usage and Cost Breakdown">
+          💰 AI Cost: <span id="tb-cost-val">$0.0000</span>
+        </button>
+
+        <div id="search-box">
+          <span class="search-hint">Ctrl+F</span>
+          <input type="text" id="search-input" placeholder="Search cases…" />
+        </div>
+      </div>
+
+      <!-- ── N8N PIPELINE WORKFLOW (Main Dashboard) ────────────────── -->
+      <div id="main-pipeline-section">
+        <div id="main-pipeline-header">
+          <div class="pipeline-title-group">
+            <span class="pipeline-badge">⚡ WORKFLOW</span>
+            <span class="pipeline-title">Case Execution Pipeline</span>
+            <span id="main-pipeline-active-case" class="pipeline-case-label">No Case Selected</span>
+            <span id="main-pipeline-status" class="pipeline-status-label">Idle</span>
+            <span id="main-pipeline-mode-badge" class="pipeline-status-label"
+              style="font-size:10.5px;letter-spacing:0.3px;color:var(--accent);border-color:rgba(0,212,170,0.3);background:rgba(0,212,170,0.08)">⚡
+              NJ Pipeline</span>
+            <span id="pipe-total-cost-badge" class="pipeline-cost-label" title="Total LLM Cost across all tasks">AI
+              Cost: $0.0000</span>
+          </div>
+          <div class="pipeline-legend">
+            <span class="leg-item"><span class="leg-dot pending"></span>Pending</span>
+            <span class="leg-item"><span class="leg-dot running"></span>Running</span>
+            <span class="leg-item"><span class="leg-dot success"></span>Success</span>
+            <span class="leg-item"><span class="leg-dot retrying"></span>Retry</span>
+            <span class="leg-item"><span class="leg-dot failed"></span>Failed</span>
+            <span class="leg-item"><span class="leg-dot skipped"></span>Skipped</span>
+          </div>
+          <button id="btn-pipeline-cost-breakdown" class="btn btn-ghost btn-sm"
+            style="color:#38bdf8;border-color:rgba(56,189,248,0.3);padding:2px 8px"
+            title="View Full AI Cost Breakdown">💰 Costs</button>
+          <button id="main-pipeline-toggle" class="btn btn-ghost btn-sm" title="Minimize / Expand Pipeline">▲
+            Collapse</button>
+        </div>
+
+        <div id="main-n8n-canvas-wrap">
+          <svg id="main-n8n-svg-layer"></svg>
+          <div id="main-n8n-nodes-stage">
+
+            <!-- NJ Node 1: Precheck -->
+            <div class="n8n-col nj-pipeline-col" id="mcol-precheck">
+              <div class="n8n-node" data-block="Precheck" id="mnode-precheck" title="Click to filter logs for Precheck">
+                <div class="n8n-node-header">
+                  <div class="node-icon-box">🔍</div>
+                  <div class="node-title-box">
+                    <span class="node-name">Precheck</span>
+                    <span class="node-sub">Eligibility & RIP</span>
+                  </div>
+                </div>
+                <div class="n8n-node-footer">
+                  <span class="node-status-badge pending">pending</span>
+                </div>
+                <div class="node-port out"></div>
+              </div>
+            </div>
+
+            <!-- NJ Node 2: Court Navigation -->
+            <div class="n8n-col nj-pipeline-col" id="mcol-nav">
+              <div class="n8n-node" data-block="Court Navigation" id="mnode-nav"
+                title="Click to filter logs for Court Navigation">
+                <div class="node-port in"></div>
+                <div class="n8n-node-header">
+                  <div class="node-icon-box">🔐</div>
+                  <div class="node-title-box">
+                    <span class="node-name">Court Navigation</span>
+                    <span class="node-sub">Portal & Docket</span>
+                  </div>
+                </div>
+                <div class="n8n-node-footer">
+                  <span class="node-status-badge pending">pending</span>
+                </div>
+                <div class="node-port out"></div>
+              </div>
+            </div>
+
+            <!-- NJ Node 3: Case Checking -->
+            <div class="n8n-col nj-pipeline-col" id="mcol-check">
+              <div class="n8n-node" data-block="Case Checking" id="mnode-check"
+                title="Click to filter logs for Case Checking">
+                <div class="node-port in"></div>
+                <div class="n8n-node-header">
+                  <div class="node-icon-box">📋</div>
+                  <div class="node-title-box">
+                    <span class="node-name">Case Checking</span>
+                    <span class="node-sub">Type & Parties</span>
+                  </div>
+                </div>
+                <div class="n8n-node-footer">
+                  <span class="node-status-badge pending">pending</span>
+                </div>
+                <div class="node-port out"></div>
+              </div>
+            </div>
+
+            <!-- NJ Node 4: File Picking -->
+            <div class="n8n-col nj-pipeline-col" id="mcol-picking">
+              <div class="n8n-node" data-block="File Picking" id="mnode-picking"
+                title="Click to filter logs for File Picking">
+                <div class="node-port in"></div>
+                <div class="n8n-node-header">
+                  <div class="node-icon-box">🎯</div>
+                  <div class="node-title-box">
+                    <span class="node-name">File Picking</span>
+                    <span class="node-sub">Matching Rows</span>
+                  </div>
+                </div>
+                <div class="n8n-node-footer">
+                  <span class="node-status-badge pending">pending</span>
+                </div>
+                <div class="node-port out"></div>
+              </div>
+            </div>
+
+            <!-- Florida Node 1: Navigate to URL -->
+            <div class="n8n-col fl-pipeline-col" id="mcol-fl-url" style="display:none">
+              <div class="n8n-node" data-block="Navigate to URL" id="mnode-fl-url"
+                title="Click to filter logs for Navigate to URL">
+                <div class="n8n-node-header">
+                  <div class="node-icon-box">🌐</div>
+                  <div class="node-title-box">
+                    <span class="node-name">Court Portal</span>
+                    <span class="node-sub">Navigate to URL</span>
+                  </div>
+                </div>
+                <div class="n8n-node-footer">
+                  <span class="node-status-badge pending">pending</span>
+                </div>
+                <div class="node-port out"></div>
+              </div>
+            </div>
+
+            <!-- Florida Node 2: Navigate to Search -->
+            <div class="n8n-col fl-pipeline-col" id="mcol-fl-search" style="display:none">
+              <div class="n8n-node" data-block="Navigate to Search" id="mnode-fl-search"
+                title="Click to filter logs for Navigate to Search">
+                <div class="node-port in"></div>
+                <div class="n8n-node-header">
+                  <div class="node-icon-box">🔎</div>
+                  <div class="node-title-box">
+                    <span class="node-name">Search Page</span>
+                    <span class="node-sub">Portal Login & Search</span>
+                  </div>
+                </div>
+                <div class="n8n-node-footer">
+                  <span class="node-status-badge pending">pending</span>
+                </div>
+                <div class="node-port out"></div>
+              </div>
+            </div>
+
+            <!-- Florida Node 3: Search Case Number -->
+            <div class="n8n-col fl-pipeline-col" id="mcol-fl-case" style="display:none">
+              <div class="n8n-node" data-block="Search Case Number" id="mnode-fl-case"
+                title="Click to filter logs for Search Case Number">
+                <div class="node-port in"></div>
+                <div class="n8n-node-header">
+                  <div class="node-icon-box">🔢</div>
+                  <div class="node-title-box">
+                    <span class="node-name">Search Case</span>
+                    <span class="node-sub">Enter Case Number</span>
+                  </div>
+                </div>
+                <div class="n8n-node-footer">
+                  <span class="node-status-badge pending">pending</span>
+                </div>
+                <div class="node-port out"></div>
+              </div>
+            </div>
+
+            <!-- Florida Node 4: Navigate to Files -->
+            <div class="n8n-col fl-pipeline-col" id="mcol-fl-files" style="display:none">
+              <div class="n8n-node" data-block="Navigate to Files" id="mnode-fl-files"
+                title="Click to filter logs for Navigate to Files">
+                <div class="node-port in"></div>
+                <div class="n8n-node-header">
+                  <div class="node-icon-box">📁</div>
+                  <div class="node-title-box">
+                    <span class="node-name">Files / Docket</span>
+                    <span class="node-sub">Open Case Documents</span>
+                  </div>
+                </div>
+                <div class="n8n-node-footer">
+                  <span class="node-status-badge pending">pending</span>
+                </div>
+                <div class="node-port out"></div>
+              </div>
+            </div>
+
+            <!-- Node 5: Parallel Branch (Court Downloading, Obituary Search, Deed Search) -->
+            <div class="n8n-col parallel-col" id="mcol-parallel">
+              <div class="parallel-frame-header">
+                <span class="parallel-icon">⚡</span>
+                <span class="parallel-text">PARALLEL BRANCH (Async)</span>
+              </div>
+              <div class="parallel-stack">
+                <!-- Subnode A: Court Downloading -->
+                <div class="n8n-node" data-block="Court Downloading" id="mnode-download"
+                  title="Court Downloading & AI Extraction (Click gear to configure AI)">
+                  <div class="node-port in"></div>
+                  <div class="n8n-node-header">
+                    <div class="node-icon-box">📥</div>
+                    <div class="node-title-box">
+                      <div style="display:flex;align-items:center;justify-content:space-between">
+                        <span class="node-name">Court Download</span>
+                        <button class="node-gear-btn" onclick="event.stopPropagation(); openNodeConfigModal('court')"
+                          title="Configure AI Provider & Model for Court Documents">⚙️</button>
+                      </div>
+                      <span class="node-sub">Foreclosure PDFs</span>
+                    </div>
+                  </div>
+                  <div class="node-ai-chips" id="mnode-chips-court">
+                    <span class="ai-chip" id="chip-complaint" title="Complaint extraction model">📄 haiku-4.5</span>
+                    <span class="ai-chip" id="chip-judgment" title="Final Judgment extraction model">⚖️ haiku-4.5</span>
+                    <span class="ai-chip" id="chip-bankruptcy" title="Bankruptcy status model">🏛️ haiku-4.5</span>
+                  </div>
+                  <div class="n8n-node-footer">
+                    <span class="node-status-badge pending">pending</span>
+                    <span class="node-cost-badge" id="cost-badge-court"
+                      onclick="event.stopPropagation(); openCostBreakdownModal('court')"
+                      title="Click for cost details">$0.0000</span>
+                  </div>
+                  <div class="node-port out"></div>
+                </div>
+
+                <!-- Subnode B: Obituary Search -->
+                <div class="n8n-node" data-block="Obituary Search" id="mnode-obituary"
+                  title="Obituary Search & Matching (Click gear to configure AI)">
+                  <div class="node-port in"></div>
+                  <div class="n8n-node-header">
+                    <div class="node-icon-box">🕊️</div>
+                    <div class="node-title-box">
+                      <div style="display:flex;align-items:center;justify-content:space-between">
+                        <span class="node-name">Obituary Search</span>
+                        <button class="node-gear-btn" onclick="event.stopPropagation(); openNodeConfigModal('obituary')"
+                          title="Configure AI Provider & Model for Obituary">⚙️</button>
+                      </div>
+                      <span class="node-sub">Deceased Search</span>
+                    </div>
+                  </div>
+                  <div class="node-ai-chips" id="mnode-chips-obituary">
+                    <span class="ai-chip" id="chip-obituary" title="Obituary matching model">🕊️ haiku-4.5</span>
+                  </div>
+                  <div class="n8n-node-footer">
+                    <span class="node-status-badge pending">pending</span>
+                    <span class="node-cost-badge" id="cost-badge-obituary"
+                      onclick="event.stopPropagation(); openCostBreakdownModal('obituary')"
+                      title="Click for cost details">$0.0000</span>
+                  </div>
+                  <div class="node-port out"></div>
+                </div>
+
+                <!-- Subnode C: Deed Search -->
+                <div class="n8n-node" data-block="Deed Search" id="mnode-deed"
+                  title="Deed Search & County Records (Click gear to configure AI)">
+                  <div class="node-port in"></div>
+                  <div class="n8n-node-header">
+                    <div class="node-icon-box">📜</div>
+                    <div class="node-title-box">
+                      <div style="display:flex;align-items:center;justify-content:space-between">
+                        <span class="node-name">Deed Search</span>
+                        <button class="node-gear-btn" onclick="event.stopPropagation(); openNodeConfigModal('deed')"
+                          title="Configure AI Provider & Model for Deed Search">⚙️</button>
+                      </div>
+                      <span class="node-sub">County Records</span>
+                    </div>
+                  </div>
+                  <div class="node-ai-chips" id="mnode-chips-deed">
+                    <span class="ai-chip" id="chip-deed" title="Deed search model">📜 haiku-4.5</span>
+                    <span class="ai-chip" id="chip-salesweb"
+                      title="Salesweb address match &amp; financial obligations model">🏠 haiku-4.5</span>
+                  </div>
+                  <div class="n8n-node-footer">
+                    <span class="node-status-badge pending">pending</span>
+                    <span class="node-cost-badge" id="cost-badge-deed"
+                      onclick="event.stopPropagation(); openCostBreakdownModal('deed')"
+                      title="Click for cost details">$0.0000</span>
+                  </div>
+                  <div class="node-port out"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Node 6: Database Adding -->
+            <div class="n8n-col" id="mcol-database">
+              <div class="n8n-node" data-block="Database Adding" id="mnode-database"
+                title="Click to filter logs for Database Adding">
+                <div class="node-port in"></div>
+                <div class="n8n-node-header">
+                  <div class="node-icon-box">💾</div>
+                  <div class="node-title-box">
+                    <span class="node-name">Database Add</span>
+                    <span class="node-sub">Supabase Record</span>
+                  </div>
+                </div>
+                <div class="n8n-node-footer">
+                  <span class="node-status-badge pending">pending</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary Panel (shown after processing ends) -->
+      <div id="summary-panel">
+        <div id="summary-panel-header">
+          <span id="summary-panel-title">📊 Run Summary</span>
+          <div class="summary-stats" style="padding:0;border:none;margin-left:4px;flex:1" id="summary-stats-inline">
+          </div>
+          <button class="btn btn-ghost btn-sm" id="btn-summary-detail">Full Report</button>
+          <button class="btn btn-ghost btn-sm" id="btn-summary-close" style="color:var(--text-dim)">✕</button>
+        </div>
+        <div id="summary-cards"></div>
+      </div>
+
+      <!-- Table -->
+      <div id="table-wrap">
+        <div id="empty-state">
+          <div class="es-icon">📂</div>
+          <div class="es-text">No cases loaded.<br>Upload an Excel file or add a case manually.</div>
+        </div>
+        <table id="case-table" style="display:none">
+          <thead>
+            <tr>
+              <th style="width:32px"><input type="checkbox" id="select-all" /></th>
+              <th data-col="case">Case ID</th>
+              <th data-col="county">County / State</th>
+              <th data-col="status">Status</th>
+              <th data-col="address">Address</th>
+              <th data-col="details">Details</th>
+              <th data-col="changes">Changes</th>
+              <th style="width:105px">Flow / Logs</th>
+            </tr>
+          </thead>
+          <tbody id="case-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- Log resize handle -->
+      <div id="log-resize"></div>
+
+      <!-- Log -->
+      <div id="log-panel">
+        <div id="log-header">
+          <span id="log-title">Output Log</span>
+          <button class="btn btn-ghost btn-sm" id="btn-clear-log" style="margin-left:auto">Clear</button>
+          <button class="btn btn-ghost btn-sm" id="btn-copy-log">Copy</button>
+          <button class="btn btn-ghost btn-sm" id="btn-autoscroll" title="Toggle autoscroll">⬇ Auto</button>
+        </div>
+        <div id="log-body"></div>
+      </div>
+
+      <!-- ── DRIVER MONITOR GRID ───────────────────────────────── -->
+      <div id="driver-monitor-section">
+        <div id="driver-monitor-header"
+          onclick="document.getElementById('driver-monitor-body').classList.toggle('open'); document.getElementById('driver-monitor-toggle').style.transform = document.getElementById('driver-monitor-body').classList.contains('open') ? 'rotate(90deg)' : ''">
+          <span id="driver-monitor-toggle" style="transform: rotate(90deg)">▶</span>
+          <span id="driver-monitor-title">🖥️ Driver Monitor</span>
+        </div>
+        <div id="driver-monitor-body" class="open"></div>
+      </div>
+    </main>
+
+    <!-- ── FOOTER ─────────────────────────────────────────────────────────── -->
+    <footer id="footer">
+      <div id="global-progress-wrap">
+        <div id="global-progress-bar"></div>
+      </div>
+      <span id="status-text-footer">Idle</span>
+      <span id="footer-counts" style="margin-left:auto"></span>
+    </footer>
+  </div>
+
+  <!-- ── ADD CASE MODAL ──────────────────────────────────────────────────────── -->
+  <div class="modal-backdrop" id="modal-add">
+    <div class="modal">
+      <div class="modal-header">
+        Add Case
+        <button class="modal-close" data-close="modal-add">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <label>County / State</label>
+          <select id="modal-county">
+            <option>New Jersey</option>
+            <option>Miami</option>
+            <option>Orange</option>
+            <option>Broward</option>
+            <option>Lee</option>
+            <option>Palm Beach</option>
+            <option>Duval</option>
+            <option>Pinellas</option>
+            <option>Volusia</option>
+            <option>Brevard</option>
+            <option>Polk</option>
+            <option>Seminole</option>
+            <option>Sarasota</option>
+            <option>Manatee</option>
+            <option>Osceola</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Case Number</label>
+          <input type="text" id="modal-case-number" placeholder="e.g. 2023-CC-012345" />
+        </div>
+        <div class="error-msg" id="modal-error"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-close="modal-add">Cancel</button>
+        <button class="btn btn-primary" id="btn-modal-add">Add Case</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TOAST CONTAINER ─────────────────────────────────────────────────────── -->
+  <div id="toast-container"></div>
+
+  <!-- ── REPORT MODAL ────────────────────────────────────────────────────────── -->
+  <div class="modal-backdrop" id="modal-report">
+    <div class="modal" style="width:860px;max-width:95vw">
+      <div class="modal-header">
+        <span>📊 Processing Report</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-ghost btn-sm" id="btn-report-copy">Copy JSON</button>
+          <button class="modal-close" data-close="modal-report">✕</button>
+        </div>
+      </div>
+      <div class="modal-body" style="padding:0;max-height:75vh;overflow-y:auto">
+        <!-- Summary bar -->
+        <div id="report-summary" style="
+        display:flex;gap:24px;padding:14px 20px;
+        background:var(--bg3);border-bottom:1px solid var(--border);
+        font-size:12px;flex-wrap:wrap">
+        </div>
+        <!-- Table -->
+        <div style="overflow-x:auto">
+          <table id="report-table" style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+              <tr id="report-thead" style="background:var(--bg3);position:sticky;top:0;z-index:2"></tr>
+            </thead>
+            <tbody id="report-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-close="modal-report">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CHANGES MODAL ─────────────────────────────────────────────────────── -->
+  <div class="modal-backdrop" id="modal-changes">
+    <div class="modal" style="width:540px">
+      <div class="modal-header">
+        <span id="changes-modal-title">📝 File Changes</span>
+        <button class="modal-close" data-close="modal-changes">✕</button>
+      </div>
+      <div class="modal-body" style="max-height:60vh;overflow-y:auto;padding:0">
+        <div id="changes-new-section" style="padding:16px 20px;border-bottom:1px solid var(--border)">
+          <div style="font-family:var(--sans);font-size:10px;font-weight:600;letter-spacing:1px;
+            text-transform:uppercase;color:var(--success);margin-bottom:10px">
+            ✅ New Files
+          </div>
+          <div id="changes-new-list" style="display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+        <div id="changes-removed-section" style="padding:16px 20px">
+          <div style="font-family:var(--sans);font-size:10px;font-weight:600;letter-spacing:1px;
+            text-transform:uppercase;color:var(--danger);margin-bottom:10px">
+            ❌ Removed Files
+          </div>
+          <div id="changes-removed-list" style="display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-close="modal-changes">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CASE LOG + SCREENSHOT OVERLAY ───────────────────────────────────────── -->
+  <div id="case-log-overlay">
+    <div id="clo-header">
+      <span id="clo-title">📋 Case Logs</span>
+      <div id="clo-search-wrap">
+        <input type="text" id="clo-search" placeholder="Search logs… (Ctrl+F)" />
+        <span id="clo-search-count"></span>
+      </div>
+      <button id="clo-close">✕ Close</button>
+    </div>
+
+    <div id="clo-body">
+      <div id="clo-logs"></div>
+      <div id="clo-screenshot-pane">
+        <div class="pane-title">Screenshot Timeline</div>
+        <img id="clo-preview" style="display:none" />
+        <div id="clo-timeline"></div>
+        <div id="clo-no-screenshot">No screenshots yet</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── N8N NODE CONFIG MODAL (Per-Task / Per-Node Multi-Provider AI) ───────── -->
+  <div class="n8n-modal-overlay" id="n8n-node-config-modal">
+    <div class="n8n-modal-card">
+      <div class="n8n-modal-header">
+        <div class="n8n-modal-title-group">
+          <span class="n8n-modal-icon" id="node-modal-icon">⚙️</span>
+          <div>
+            <div class="n8n-modal-title" id="node-modal-title">Node AI Configuration</div>
+            <div class="n8n-modal-subtitle" id="node-modal-subtitle">Configure provider, model, and API key for this
+              workflow node</div>
+          </div>
+        </div>
+        <button class="n8n-modal-close" id="btn-close-node-modal" title="Close">✕</button>
+      </div>
+
+      <div class="n8n-modal-body">
+        <!-- Sub-task switcher for Court Download node -->
+        <div id="node-modal-subtasks" style="display:none">
+          <label
+            style="font-size:11px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Select
+            Court Extraction Task</label>
+          <div class="node-sub-tabs" style="margin-top:4px">
+            <button class="node-sub-tab active" data-task="complaint" onclick="switchNodeTaskTab('complaint')">📄
+              Complaint</button>
+            <button class="node-sub-tab" data-task="judgment" onclick="switchNodeTaskTab('judgment')">⚖️ Final
+              Judgment</button>
+            <button class="node-sub-tab" data-task="bankruptcy" onclick="switchNodeTaskTab('bankruptcy')">🏛️
+              Bankruptcy</button>
+          </div>
+        </div>
+
+        <div class="n8n-param-group">
+          <label class="n8n-param-label">
+            <span style="font-size:12px;font-weight:600;color:var(--text-hi)">AI Provider / Service</span>
+            <span style="font-size:11px;color:var(--text-dim)">Choose LLM backend service for this step</span>
+          </label>
+          <select id="nm-service" class="input" onchange="onModalServiceChange()">
+            <option value="anthropic">Anthropic Claude (Default)</option>
+            <option value="google">Google Gemini</option>
+            <option value="groq">Groq Cloud (Ultra-fast inference)</option>
+            <option value="openrouter">OpenRouter (Multi-model gateway)</option>
+            <option value="freellmapi">FreeLLMAPI (Logfare)</option>
+          </select>
+        </div>
+
+        <div class="n8n-param-group">
+          <label class="n8n-param-label">
+            <span style="font-size:12px;font-weight:600;color:var(--text-hi)">Model Name</span>
+            <span style="font-size:11px;color:var(--text-dim)">Model identifier passed to provider API</span>
+          </label>
+          <input type="text" id="nm-model" class="input"
+            placeholder="e.g. gemini-2.5-flash or llama-3.3-70b-versatile" />
+          <div class="model-quick-chips" id="nm-quick-chips"></div>
+        </div>
+
+        <div class="n8n-param-group">
+          <label class="n8n-param-label">
+            <span style="font-size:12px;font-weight:600;color:var(--text-hi)">API Key (Override)</span>
+            <span style="font-size:11px;color:var(--text-dim)">Leave blank to use environment variable or global
+              default</span>
+          </label>
+          <div style="position:relative;display:flex;align-items:center">
+            <input type="password" id="nm-api-key" class="input" placeholder="Leave empty for default key"
+              style="width:100%;padding-right:32px" />
+            <button type="button" onclick="toggleModalKeyVisibility()"
+              style="position:absolute;right:8px;background:none;border:none;color:var(--text-dim);cursor:pointer"
+              title="Toggle visibility">👁️</button>
+          </div>
+        </div>
+
+        <div
+          style="background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.2);border-radius:6px;padding:10px 12px;font-size:11px;display:flex;gap:8px;align-items:center">
+          <span style="font-size:16px">💡</span>
+          <span style="color:var(--text-dim);line-height:1.4" id="nm-hint-text">
+            Each workflow task can use completely separate providers, keys, and models. Changes take effect on
+            subsequent case processing.
+          </span>
+        </div>
+      </div>
+
+      <div class="n8n-modal-footer">
+        <button class="btn btn-ghost" id="btn-cancel-node-modal">Cancel</button>
+        <button class="btn btn-primary" id="btn-save-node-modal" onclick="saveNodeConfigFromModal()">💾 Save Task
+          Parameters</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── LLM COST BREAKDOWN MODAL ─────────────────────────────────────────────── -->
+  <div class="n8n-modal-overlay" id="ai-cost-breakdown-modal">
+    <div class="n8n-modal-card wide">
+      <div class="n8n-modal-header">
+        <div class="n8n-modal-title-group">
+          <span class="n8n-modal-icon">💰</span>
+          <div>
+            <div class="n8n-modal-title">LLM Usage & Cost Analytics</div>
+            <div class="n8n-modal-subtitle">Real-time token metrics and USD expenditure across all pipeline operations
+            </div>
+          </div>
+        </div>
+        <button class="n8n-modal-close" id="btn-close-cost-modal" title="Close">✕</button>
+      </div>
+
+      <div class="n8n-modal-body">
+        <!-- 4 KPI Cards -->
+        <div class="cost-kpi-grid">
+          <div class="cost-kpi-card">
+            <div class="kpi-label">Total Spend (USD)</div>
+            <div class="kpi-value total-spend" id="kpi-total-cost">$0.0000</div>
+            <div class="kpi-sub">Across all pipeline tasks</div>
+          </div>
+          <div class="cost-kpi-card">
+            <div class="kpi-label">Total LLM Calls</div>
+            <div class="kpi-value" id="kpi-total-calls">0</div>
+            <div class="kpi-sub">API requests dispatched</div>
+          </div>
+          <div class="cost-kpi-card">
+            <div class="kpi-label">Prompt Tokens (In)</div>
+            <div class="kpi-value" id="kpi-prompt-tokens">0</div>
+            <div class="kpi-sub">Input context tokens</div>
+          </div>
+          <div class="cost-kpi-card">
+            <div class="kpi-label">Completion Tokens (Out)</div>
+            <div class="kpi-value" id="kpi-completion-tokens">0</div>
+            <div class="kpi-sub">Generated output tokens</div>
+          </div>
+        </div>
+
+        <!-- Cost Breakdown Table -->
+        <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
+          <table class="cost-table">
+            <thead>
+              <tr>
+                <th>Workflow Task / Operation</th>
+                <th>Service & Model</th>
+                <th style="text-align:right">Calls</th>
+                <th style="text-align:right">Prompt Tokens</th>
+                <th style="text-align:right">Comp Tokens</th>
+                <th style="text-align:right">Total Tokens</th>
+                <th style="text-align:right">Cost (USD)</th>
+              </tr>
+            </thead>
+            <tbody id="cost-table-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+            <tfoot>
+              <tr id="cost-table-tfoot">
+                <th colspan="2">Total Pipeline Spend</th>
+                <th style="text-align:right" id="ft-calls">0</th>
+                <th style="text-align:right" id="ft-prompt">0</th>
+                <th style="text-align:right" id="ft-comp">0</th>
+                <th style="text-align:right" id="ft-tokens">0</th>
+                <th style="text-align:right" id="ft-cost" style="color:var(--accent)">$0.0000</th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding-top:4px">
+          <span style="font-size:11px;color:var(--text-dim)">
+            Pricing calculated automatically based on vendor token rates (Google Gemini, Groq, OpenRouter, Anthropic).
+          </span>
+          <button class="btn btn-ghost btn-sm" id="btn-reset-llm-costs" onclick="resetAllLlmCosts()"
+            style="color:var(--danger);border-color:rgba(255,71,87,0.3)">
+            🔄 Reset LLM Cost Counters
+          </button>
+        </div>
+      </div>
+
+      <div class="n8n-modal-footer">
+        <button class="btn btn-ghost" id="btn-done-cost-modal" onclick="closeCostBreakdownModal()">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Restarting Overlay Modal ── -->
+  <div class="modal-backdrop" id="modal-restarting"
+    style="z-index: 100000; backdrop-filter: blur(8px); background: rgba(5, 7, 10, 0.88);">
+    <div class="modal"
+      style="width: 440px; text-align: center; border-color: var(--warn); box-shadow: 0 0 35px rgba(245, 158, 11, 0.25);">
+      <div class="modal-header"
+        style="justify-content: center; border-bottom: 1px solid var(--border2); padding: 18px;">
+        <span
+          style="font-size: 16px; font-weight: 700; color: var(--warn); display: flex; align-items: center; gap: 8px;">
+          ⚡ Application Restarting
+        </span>
+      </div>
+      <div class="modal-body"
+        style="padding: 24px 20px; display: flex; flex-direction: column; align-items: center; gap: 16px;">
+        <div
+          style="width: 48px; height: 48px; border: 4px solid var(--border2); border-top-color: var(--warn); border-radius: 50%; animation: spin 1s linear infinite;">
+        </div>
+        <div style="font-size: 13px; color: var(--text-hi); font-weight: 600;" id="restart-status-main">
+          Terminating processes and relaunching main.py...
+        </div>
+        <div style="font-size: 11.5px; color: var(--text-dim); line-height: 1.5;" id="restart-status-sub">
+          The server is shutting down and restarting from scratch. This page will automatically reconnect and reload as
+          soon as the app is ready.
+        </div>
+        <div
+          style="font-size: 11px; font-family: var(--mono); color: var(--accent); background: rgba(0, 212, 170, 0.08); border: 1px solid rgba(0, 212, 170, 0.2); padding: 6px 12px; border-radius: 4px; width: 100%;"
+          id="restart-timer">
+          Attempting to reconnect (0s)...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ════════════════════════════════════════════════════════════════════════════
+       STATE
+       ════════════════════════════════════════════════════════════════════════════ */
+    const cases = {};   // case_id → row data
+    const caseBlocks = {}; // case_id → { [block_name]: status }
+    let selected = new Set();
+
+    // ── LLM Cost & Per-Node Multi-Provider State ──
+    let currentLlmCosts = null;
+    let currentLlmConfigs = {
+      complaint: { service: "anthropic", model: "claude-haiku-4-5-20251001", api_key: "ANTHROPIC_DEFAULT_KEY" },
+      judgment: { service: "anthropic", model: "claude-haiku-4-5-20251001", api_key: "ANTHROPIC_DEFAULT_KEY" },
+      bankruptcy: { service: "anthropic", model: "claude-haiku-4-5-20251001", api_key: "ANTHROPIC_DEFAULT_KEY" },
+      deed: { service: "anthropic", model: "claude-haiku-4-5-20251001", api_key: "ANTHROPIC_DEFAULT_KEY" },
+      obituary: { service: "anthropic", model: "claude-haiku-4-5-20251001", api_key: "ANTHROPIC_DEFAULT_KEY" },
+      salesweb: { service: "anthropic", model: "claude-haiku-4-5-20251001", api_key: "ANTHROPIC_DEFAULT_KEY" }
+    };
+    let activeNodeModalType = "court";
+    let activeNodeModalTask = "complaint";
+
+    const PROVIDER_MODEL_PRESETS = {
+      anthropic: ["claude-haiku-4-5-20251001", "claude-3-5-haiku-20241022", "claude-3-7-sonnet-20250219", "claude-3-haiku-20240307"],
+      google: ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"],
+      groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
+      openrouter: ["meta-llama/llama-3.3-70b-instruct", "anthropic/claude-3.5-haiku", "google/gemini-2.5-flash", "openai/gpt-4o-mini"],
+      freellmapi: ["gemma-4-26b", "openai/gpt-oss-120b", "gpt-4o-mini"]
+    };
+
+    const TASK_META = {
+      complaint: { name: "Complaint Extraction", icon: "📄", node: "court" },
+      judgment: { name: "Final Judgment Extraction", icon: "⚖️", node: "court" },
+      bankruptcy: { name: "Bankruptcy Status", icon: "🏛️", node: "court" },
+      deed: { name: "Deed Search", icon: "📜", node: "deed" },
+      obituary: { name: "Obituary Search", icon: "🕊️", node: "obituary" },
+      salesweb: { name: "Salesweb Analysis (Address Match + Financial Obligations)", icon: "🏠", node: "deed" }
+    };
+    let sortCol = null;
+    let sortDir = 1;
+    let searchQ = "";
+    let autoScroll = true;
+    let isRunning = false;
+    let lastReport = null;  // ← stores last report_cases for manual re-open
+    const removedCases = new Set();  // ← cases deleted by user, ignore future updates
+
+    /* ════════════════════════════════════════════════════════════════════════════
+       WEBSOCKET
+       ════════════════════════════════════════════════════════════════════════════ */
+    const socket = io();
+
+    socket.on("connect", () => {
+      setConnected(true);
+    });
+    socket.on("disconnect", () => {
+      setConnected(false);
+    });
+
+    socket.on("init_state", (data) => {
+      // populate everything
+      Object.values(data.cases || []).forEach(c => {
+        cases[c.case] = c;
+        if (c.block_statuses) {
+          caseBlocks[c.case] = Object.assign({}, c.block_statuses);
+        }
+      });
+      renderTable();
+      data.log.forEach(l => appendLogLine(l));
+      setProgress(data.progress || 0);
+      setStatusText(data.status || "Idle");
+      setRunning(data.running || false);
+      applySettings(data.settings || {});
+      if (data.llm_costs) {
+        currentLlmCosts = data.llm_costs;
+        updateCostBadges(data.llm_costs);
+      }
+      if (data.settings && data.settings.llm_configs) {
+        currentLlmConfigs = Object.assign(currentLlmConfigs, data.settings.llm_configs);
+        updateNodeAiBadges();
+      }
+      updateCounts();
+
+      // Automatically select first running or available case for main N8N canvas
+      const allCases = Object.values(cases);
+      const activeOrFirst = allCases.find(x => x.status === "Running" || x.status === "In Progress") || allCases[0];
+      if (activeOrFirst) {
+        updateN8nStage(activeOrFirst.case);
+      } else {
+        updateN8nStage(null);
+      }
+    });
+
+    socket.on("llm_costs_updated", (data) => {
+      currentLlmCosts = data;
+      updateCostBadges(data);
+      if (document.getElementById("ai-cost-breakdown-modal").classList.contains("open")) {
+        renderCostBreakdownTable();
+      }
+    });
+
+    socket.on("settings_updated", (data) => {
+      if (data.llm_configs) {
+        currentLlmConfigs = Object.assign(currentLlmConfigs, data.llm_configs);
+        updateNodeAiBadges();
+      }
+    });
+
+    socket.on("case_update", (c) => {
+      if (removedCases.has(c.case)) return;  // ← ignore updates for deleted cases
+      cases[c.case] = c;
+      if (c.block_statuses) {
+        caseBlocks[c.case] = Object.assign(caseBlocks[c.case] || {}, c.block_statuses);
+      }
+      upsertRow(c);
+      updateCounts();
+      if (!currentPipelineCaseId || currentPipelineCaseId === c.case || activeCaseLog === c.case) {
+        updateN8nStage(c.case);
+      }
+    });
+
+    socket.on("block_status", ({ case_id, block, status }) => {
+      if (!case_id) return;
+      if (!caseBlocks[case_id]) {
+        caseBlocks[case_id] = deriveBlockStatuses(cases[case_id]);
+      }
+      caseBlocks[case_id][block] = status;
+
+      // Update mini pipeline trail in table row
+      updateRowMiniPipeline(case_id);
+
+      // If this case is open or current on the main stage, update live diagram
+      if (!currentPipelineCaseId || currentPipelineCaseId === case_id || activeCaseLog === case_id) {
+        updateN8nStage(case_id);
+      }
+    });
+
+    socket.on("remove_cases", ({ case_ids }) => {
+      case_ids.forEach(id => {
+        removedCases.add(id);          // ← mark as deleted
+        delete cases[id];
+        delete caseBlocks[id];
+        selected.delete(id);
+        const row = document.getElementById(`row-${CSS.escape(id)}`);
+        if (row) row.remove();
+      });
+      toggleEmptyState();
+      updateCounts();
+    });
+
+    socket.on("clear_cases", () => {
+      Object.keys(cases).forEach(k => delete cases[k]);
+      Object.keys(caseBlocks).forEach(k => delete caseBlocks[k]);
+      selected.clear();
+      document.getElementById("case-tbody").innerHTML = "";
+      toggleEmptyState();
+      updateCounts();
+    });
+
+    socket.on("log_line", ({ line }) => {
+      appendLogLine(line);
+    });
+
+    socket.on("clear_log", () => {
+      document.getElementById("log-body").innerHTML = "";
+    });
+
+    socket.on("progress", ({ value }) => setProgress(value));
+    socket.on("status_text", ({ text }) => setStatusText(text));
+
+    socket.on("app_restarting", () => {
+      showRestartingOverlay();
+    });
+
+    socket.on("processing_state", ({ running, report }) => {
+      setRunning(running);
+      if (!running && report && Object.keys(report).length > 0) {
+        setProgress(1);  // ← fill to 100% when done
+        lastReport = report;
+        document.getElementById("btn-view-report").disabled = false;
+        document.getElementById("btn-download-batch").style.display = "inline-flex";
+        renderSummaryPanel(report);
+        renderReport(report);
+        openModal("modal-report");
+      } else if (running) {
+        setProgress(0);  // ← reset when starting
+      }
+    });
+
+    /* ════════════════════════════════════════════════════════════════════════════
+       INLINE SUMMARY PANEL
+       ════════════════════════════════════════════════════════════════════════════ */
+    function statusColor(status) {
+      if (!status) return "var(--text-dim)";
+      if (/completed/i.test(status)) return "var(--success)";
+      if (/error|not found|failed/i.test(status)) return "var(--danger)";
+      if (/skipped/i.test(status)) return "var(--warn)";
+      if (/downloading/i.test(status)) return "var(--accent)";
+      return "var(--text-dim)";
+    }
+
+    function applySettings(s) {
+      if (s.keywords) document.getElementById("keywords").value = s.keywords;
+      if (s.unwanted_keywords) document.getElementById("unwanted-keywords").value = s.unwanted_keywords;
+      if (s.output_folder) document.getElementById("output-folder").value = s.output_folder;
+      if (s.batch_name) document.getElementById("batch-name").value = s.batch_name;
+      if (s.headless_mode !== undefined)
+        document.getElementById("headless-mode").checked = s.headless_mode;
+      if (s.max_workers) document.getElementById("max-workers").value = s.max_workers;
+      if (s.skip_closed_cases !== undefined)
+        document.getElementById("skip-closed-cases").checked = s.skip_closed_cases;
+      if (s.skip_business !== undefined)
+        document.getElementById("skip-business").checked = s.skip_business;
+      if (s.llm_service && document.getElementById("llm-service")) document.getElementById("llm-service").value = s.llm_service;
+      if (s.llm_api_key && document.getElementById("llm-api-key")) document.getElementById("llm-api-key").value = s.llm_api_key;
+      if (s.llm_model && document.getElementById("llm-model")) document.getElementById("llm-model").value = s.llm_model;
+      if (s.llm_configs) {
+        currentLlmConfigs = Object.assign(currentLlmConfigs, s.llm_configs);
+        updateNodeAiBadges();
+      }
+      if (s.llm_costs) {
+        currentLlmCosts = s.llm_costs;
+        updateCostBadges(s.llm_costs);
+      }
+    }
+    // ── Batch Name ─────────────────────────────────────────────────────────────────
+    document.getElementById("btn-set-batch-name").addEventListener("click", async () => {
+      const batchName = document.getElementById("batch-name").value.trim();
+      if (!batchName) {
+        toast("Please enter a batch name", "warn");
+        return;
+      }
+      const r = await api("POST", "/api/settings", { batch_name: batchName });
+      if (r.ok) {
+        toast("Batch name saved", "success");
+        // Update the filename display to show the custom name
+        document.getElementById("dz-name").textContent = `📋 Batch: ${batchName}`;
+      } else {
+        toast(r.error || "Failed to save batch name", "error");
+      }
+    });
+    function renderSummaryPanel(report) {
+      const panel = document.getElementById("summary-panel");
+      const caseList = Object.values(report);
+      if (!caseList.length) return;
+
+      // ── Stats ────────────────────────────────────────────────────────────────
+      const total = caseList.length;
+      const completed = caseList.filter(c => /completed/i.test(c.status || "")).length;
+      const skipped = caseList.filter(c => /skipped/i.test(c.status || "")).length;
+      const errors = caseList.filter(c => /error|not found/i.test(c.status || "")).length;
+      const totalFiles = caseList.reduce((s, c) => s + (c.files || []).length, 0);
+      const failedF = caseList.reduce((s, c) => s + (c.failed_files || []).length, 0);
+      const avgDur = (() => {
+        const durs = caseList.map(c => parseFloat(c["processing_duration"] || 0)).filter(Boolean);
+        return durs.length ? (durs.reduce((a, b) => a + b, 0) / durs.length).toFixed(1) : null;
+      })();
+
+      const pills = [
+        { val: total, label: "cases", color: "var(--text-hi)" },
+        { val: completed, label: "completed", color: "var(--success)" },
+        { val: skipped, label: "skipped", color: "var(--warn)" },
+        { val: errors, label: "errors", color: "var(--danger)" },
+        { val: totalFiles, label: "files", color: "var(--accent)" },
+        ...(failedF ? [{ val: failedF, label: "failed files", color: "var(--danger)" }] : []),
+        ...(avgDur ? [{ val: avgDur + "s", label: "avg/case", color: "var(--text-dim)" }] : []),
+      ];
+
+      document.getElementById("summary-stats-inline").innerHTML = pills.map(p =>
+        `<div class="stat-pill">
+      <span class="stat-val" style="color:${p.color}">${p.val}</span>
+      <span style="color:var(--text-dim)">${p.label}</span>
+    </div>`
+      ).join("");
+
+      // ── Case cards ────────────────────────────────────────────────────────────
+      const cards = document.getElementById("summary-cards");
+      cards.innerHTML = caseList.map(c => {
+        const st = c.status || "—";
+        const files = (c.files || []).length;
+        const failed = (c.failed_files || []).length;
+        const dur = c["processing_duration"] ? parseFloat(c["processing_duration"]).toFixed(1) + "s" : "";
+        const filesLine = files
+          ? `✅ ${files} file${files !== 1 ? "s" : ""}` + (failed ? ` · ❌ ${failed} failed` : "")
+          : failed ? `❌ ${failed} failed` : "No files";
+
+        return `<div class="case-card" title="${c["Case number"] || ""} — ${st}">
+      <div class="cc-id">${c["Case number"] || "—"}</div>
+      <div class="cc-county">${c.County || c.county || ""} ${c.case_type ? "· " + c.case_type : ""}</div>
+      <div class="cc-status" style="color:${statusColor(st)}">${st}</div>
+      ${dur ? `<div style="color:var(--text-dim);font-size:10px">⏱ ${dur}</div>` : ""}
+      <div class="cc-files">${filesLine}</div>
+    </div>`;
+      }).join("");
+
+      panel.classList.add("open");
+    }
+
+    // ── Summary panel buttons ─────────────────────────────────────────────────────
+    document.getElementById("btn-summary-close").addEventListener("click", () => {
+      document.getElementById("summary-panel").classList.remove("open");
+    });
+    document.getElementById("btn-summary-detail").addEventListener("click", () => {
+      if (lastReport) { renderReport(lastReport); openModal("modal-report"); }
+    });
+
+    /* ════════════════════════════════════════════════════════════════════════════
+       REPORT RENDERING
+       ════════════════════════════════════════════════════════════════════════════ */
+    function renderReport(report) {
+      const cases = Object.values(report);
+      if (!cases.length) return;
+
+      // ── Collect all unique keys across all cases ──────────────────────────────
+      const priorityCols = ["Case number", "County", "case_type", "court_case_status", "status", "processing_duration"];
+      const allKeys = new Set();
+      cases.forEach(c => Object.keys(c).forEach(k => { if (k !== "files" && k !== "failed_files") allKeys.add(k); }));
+      const extraKeys = [...allKeys].filter(k => !priorityCols.includes(k));
+      const cols = [...priorityCols.filter(k => allKeys.has(k)), ...extraKeys];
+
+      // ── Summary bar ───────────────────────────────────────────────────────────
+      const total = cases.length;
+      const completed = cases.filter(c => /completed/i.test(c.status || "")).length;
+      const skipped = cases.filter(c => /skipped/i.test(c.status || "")).length;
+      const errors = cases.filter(c => /error|not found/i.test(c.status || "")).length;
+      const totalFiles = cases.reduce((s, c) => s + (c.files || []).length, 0);
+      const failed = cases.reduce((s, c) => s + (c.failed_files || []).length, 0);
+
+      document.getElementById("report-summary").innerHTML = `
+    <span style="color:var(--text-hi)">📁 <strong>${total}</strong> cases</span>
+    <span style="color:var(--success)">✅ <strong>${completed}</strong> completed</span>
+    <span style="color:var(--warn)">⏭ <strong>${skipped}</strong> skipped</span>
+    <span style="color:var(--danger)">❌ <strong>${errors}</strong> errors</span>
+    <span style="color:var(--accent)">📄 <strong>${totalFiles}</strong> files downloaded</span>
+    ${failed ? `<span style="color:var(--danger)">⚠️ <strong>${failed}</strong> failed files</span>` : ""}
+  `;
+
+      // ── Table header ──────────────────────────────────────────────────────────
+      const thead = document.getElementById("report-thead");
+      thead.innerHTML = cols.map(k =>
+        `<th style="padding:8px 12px;text-align:left;font-family:var(--sans);font-size:10px;
+      font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);
+      white-space:nowrap;border-bottom:1px solid var(--border)">${k}</th>`
+      ).join("") + `<th style="padding:8px 12px;text-align:left;font-family:var(--sans);font-size:10px;
+    font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);
+    border-bottom:1px solid var(--border)">Files</th>`;
+
+      // ── Table rows ────────────────────────────────────────────────────────────
+      const tbody = document.getElementById("report-tbody");
+      tbody.innerHTML = cases.map((c, i) => {
+        const statusColor = /completed/i.test(c.status || "") ? "var(--success)"
+          : /error|not found/i.test(c.status || "") ? "var(--danger)"
+            : /skipped/i.test(c.status || "") ? "var(--warn)"
+              : "var(--text)";
+
+        const cells = cols.map(k => {
+          let val = c[k] ?? "";
+          const style = k === "status"
+            ? `style="color:${statusColor};font-weight:500"`
+            : k === "processing_duration" && val
+              ? `style="color:var(--text-dim)"`
+              : "";
+          if (k === "processing_duration" && val) val = `${parseFloat(val).toFixed(1)}s`;
+          return `<td ${style} style="padding:7px 12px;border-bottom:1px solid var(--border);
+        white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis">${val}</td>`;
+        }).join("");
+
+        const files = (c.files || []);
+        const failedF = (c.failed_files || []);
+        const fileCell = files.length
+          ? `<span style="color:var(--success)">✅ ${files.length} file${files.length !== 1 ? "s" : ""}</span>`
+          + (failedF.length ? ` <span style="color:var(--danger)">/ ❌ ${failedF.length} failed</span>` : "")
+          : `<span style="color:var(--text-dim)">—</span>`;
+
+        const bg = i % 2 === 0 ? "transparent" : "rgba(255,255,255,.02)";
+        return `<tr style="background:${bg}">${cells}
+      <td style="padding:7px 12px;border-bottom:1px solid var(--border)">${fileCell}</td>
+    </tr>`;
+      }).join("");
+
+      // ── Copy JSON ─────────────────────────────────────────────────────────────
+      document.getElementById("btn-report-copy").onclick = () => {
+        navigator.clipboard.writeText(JSON.stringify(report, null, 2))
+          .then(() => toast("Report JSON copied", "success"));
+      };
+    }
+
+    /* ════════════════════════════════════════════════════════════════════════════
+       API HELPERS
+       ════════════════════════════════════════════════════════════════════════════ */
+    async function api(method, path, body) {
+      const opts = { method, headers: { "Content-Type": "application/json" } };
+      if (body) opts.body = JSON.stringify(body);
+      const r = await fetch(path, opts);
+      return r.json();
+    }
+
+    /* ════════════════════════════════════════════════════════════════════════════
+       TABLE RENDERING
+       ════════════════════════════════════════════════════════════════════════════ */
+    function colorForStatus(status, color) {
+      return color || "#e2e8f0";
+    }
+
+    function makeStatusBadge(status, color) {
+      return `<span class="status-badge" style="color:${colorForStatus(status, color)}">${status}</span>`;
+    }
+
+    const NJ_PIPELINE_BLOCKS = [
+      "Precheck",
+      "Court Navigation",
+      "Case Checking",
+      "File Picking",
+      "Court Downloading",
+      "Obituary Search",
+      "Deed Search",
+      "Database Adding"
+    ];
+
+    const FL_PIPELINE_BLOCKS = [
+      "Navigate to URL",
+      "Navigate to Search",
+      "Search Case Number",
+      "Navigate to Files",
+      "Court Downloading",
+      "Obituary Search",
+      "Deed Search",
+      "Database Adding"
+    ];
+
+    const PIPELINE_BLOCKS = [
+      "Precheck",
+      "Court Navigation",
+      "Case Checking",
+      "File Picking",
+      "Navigate to URL",
+      "Navigate to Search",
+      "Search Case Number",
+      "Navigate to Files",
+      "Court Downloading",
+      "Obituary Search",
+      "Deed Search",
+      "Database Adding"
+    ];
+
+    function getCasePipelineType(c) {
+      if (!c) {
+        const countySel = document.getElementById("range-county");
+        if (countySel) {
+          const val = (countySel.value || "").toLowerCase();
+          if (val && val !== "new jersey" && val !== "nj") return "fl";
+        }
+        return "nj";
+      }
+      if (c.block_statuses) {
+        if ("Navigate to URL" in c.block_statuses || "Navigate to Search" in c.block_statuses || "Search Case Number" in c.block_statuses || "Navigate to Files" in c.block_statuses) {
+          return "fl";
+        }
+        if ("Precheck" in c.block_statuses || "Court Navigation" in c.block_statuses || "Case Checking" in c.block_statuses || "File Picking" in c.block_statuses) {
+          return "nj";
+        }
+      }
+      const county = (c.county || "").toLowerCase();
+      if (county && county !== "new jersey" && county !== "nj") {
+        return "fl";
+      }
+      return "nj";
+    }
+
+    function deriveBlockStatuses(c) {
+      const isFl = getCasePipelineType(c) === "fl";
+      const blockList = isFl ? FL_PIPELINE_BLOCKS : NJ_PIPELINE_BLOCKS;
+      const s = {};
+      blockList.forEach(b => s[b] = "pending");
+      if (!c) return s;
+
+      if (c.block_statuses && Object.keys(c.block_statuses).length > 0) {
+        Object.assign(s, c.block_statuses);
+        if (s["Download Files"] && !s["Court Downloading"]) {
+          s["Court Downloading"] = s["Download Files"];
+        }
+        return s;
+      }
+
+      const statusText = (c.status || "").toLowerCase();
+      const detailsText = (c.details || "").toLowerCase();
+      const combined = statusText + " " + detailsText;
+
+      if (statusText === "completed" || statusText === "ready to submit") {
+        blockList.forEach(b => s[b] = "success");
+        return s;
+      }
+
+      if (isFl) {
+        if (combined.includes("not found")) {
+          s["Navigate to URL"] = "success";
+          s["Navigate to Search"] = "success";
+          s["Search Case Number"] = "failed";
+          s["Navigate to Files"] = "skipped";
+          s["Court Downloading"] = "skipped";
+          s["Obituary Search"] = "skipped";
+          s["Deed Search"] = "skipped";
+          s["Database Adding"] = "skipped";
+          return s;
+        }
+
+        if (combined.includes("starting") || combined.includes("navigate_to_url") || combined.includes("opening portal")) {
+          s["Navigate to URL"] = "running";
+          return s;
+        }
+
+        if (combined.includes("search page") || combined.includes("logging") || combined.includes("navigate_to_search")) {
+          s["Navigate to URL"] = "success";
+          s["Navigate to Search"] = "running";
+          return s;
+        }
+
+        if (combined.includes("searching case") || combined.includes("search_case_number")) {
+          s["Navigate to URL"] = "success";
+          s["Navigate to Search"] = "success";
+          s["Search Case Number"] = "running";
+          return s;
+        }
+
+        if (combined.includes("navigate_to_files") || combined.includes("docket tab") || combined.includes("files tab") || combined.includes("navigating to files")) {
+          s["Navigate to URL"] = "success";
+          s["Navigate to Search"] = "success";
+          s["Search Case Number"] = "success";
+          s["Navigate to Files"] = "running";
+          return s;
+        }
+
+        if (combined.includes("downloading") || combined.includes("court downloading") || combined.includes("scanning") || combined.includes("matching files")) {
+          s["Navigate to URL"] = "success";
+          s["Navigate to Search"] = "success";
+          s["Search Case Number"] = "success";
+          s["Navigate to Files"] = "success";
+          s["Court Downloading"] = "running";
+          s["Obituary Search"] = "running";
+          s["Deed Search"] = "running";
+          return s;
+        }
+
+        if (combined.includes("obituary")) {
+          s["Navigate to URL"] = "success";
+          s["Navigate to Search"] = "success";
+          s["Search Case Number"] = "success";
+          s["Navigate to Files"] = "success";
+          s["Court Downloading"] = "success";
+          s["Obituary Search"] = "running";
+          s["Deed Search"] = "running";
+          return s;
+        }
+
+        if (combined.includes("deed")) {
+          s["Navigate to URL"] = "success";
+          s["Navigate to Search"] = "success";
+          s["Search Case Number"] = "success";
+          s["Navigate to Files"] = "success";
+          s["Court Downloading"] = "success";
+          s["Obituary Search"] = "success";
+          s["Deed Search"] = "running";
+          return s;
+        }
+
+        if (combined.includes("database") || combined.includes("saving") || combined.includes("supabase") || combined.includes("zillow") || combined.includes("adding")) {
+          s["Navigate to URL"] = "success";
+          s["Navigate to Search"] = "success";
+          s["Search Case Number"] = "success";
+          s["Navigate to Files"] = "success";
+          s["Court Downloading"] = "success";
+          s["Obituary Search"] = "success";
+          s["Deed Search"] = "success";
+          s["Database Adding"] = "running";
+          return s;
+        }
+
+        if (combined.includes("error") || combined.includes("failed")) {
+          s["Navigate to URL"] = "success";
+          s["Navigate to Search"] = "failed";
+          return s;
+        }
+
+        return s;
+      }
+
+      // NJ status derivation (existing)
+      if (statusText.includes("not found")) {
+        s["Precheck"] = "success";
+        s["Court Navigation"] = "success";
+        s["Case Checking"] = "failed";
+        s["File Picking"] = "skipped";
+        s["Court Downloading"] = "skipped";
+        s["Obituary Search"] = "skipped";
+        s["Deed Search"] = "skipped";
+        s["Database Adding"] = "skipped";
+        return s;
+      }
+
+      if (statusText.includes("eligibility") || statusText.includes("zillow")) {
+        s["Precheck"] = "running";
+        return s;
+      }
+
+      if (statusText.includes("login") || statusText.includes("logging") || statusText.includes("docket") || statusText.includes("searching case")) {
+        s["Precheck"] = "success";
+        s["Court Navigation"] = "running";
+        return s;
+      }
+
+      if (statusText.includes("checking case") || statusText.includes("case checking")) {
+        s["Precheck"] = "success";
+        s["Court Navigation"] = "success";
+        s["Case Checking"] = "running";
+        return s;
+      }
+
+      if (statusText.includes("picking") || statusText.includes("matching files")) {
+        s["Precheck"] = "success";
+        s["Court Navigation"] = "success";
+        s["Case Checking"] = "success";
+        s["File Picking"] = "running";
+        return s;
+      }
+
+      if (statusText.includes("downloading") || statusText.includes("court downloading")) {
+        s["Precheck"] = "success";
+        s["Court Navigation"] = "success";
+        s["Case Checking"] = "success";
+        s["File Picking"] = "success";
+        s["Court Downloading"] = "running";
+        s["Obituary Search"] = "running";
+        s["Deed Search"] = "running";
+        return s;
+      }
+
+      if (statusText.includes("obituary")) {
+        s["Precheck"] = "success";
+        s["Court Navigation"] = "success";
+        s["Case Checking"] = "success";
+        s["File Picking"] = "success";
+        s["Court Downloading"] = "success";
+        s["Obituary Search"] = "running";
+        s["Deed Search"] = "running";
+        return s;
+      }
+
+      if (statusText.includes("deed")) {
+        s["Precheck"] = "success";
+        s["Court Navigation"] = "success";
+        s["Case Checking"] = "success";
+        s["File Picking"] = "success";
+        s["Court Downloading"] = "success";
+        s["Obituary Search"] = "success";
+        s["Deed Search"] = "running";
+        return s;
+      }
+
+      if (statusText.includes("database") || statusText.includes("saving") || statusText.includes("adding")) {
+        s["Precheck"] = "success";
+        s["Court Navigation"] = "success";
+        s["Case Checking"] = "success";
+        s["File Picking"] = "success";
+        s["Court Downloading"] = "success";
+        s["Obituary Search"] = "success";
+        s["Deed Search"] = "success";
+        s["Database Adding"] = "running";
+        return s;
+      }
+
+      if (statusText.includes("error") || statusText.includes("failed")) {
+        s["Precheck"] = "success";
+        s["Court Navigation"] = "success";
+        s["Case Checking"] = "failed";
+        return s;
+      }
+
+      return s;
+    }
+
+    function renderMiniPipelineTrail(caseId, blocks) {
+      const b = blocks || {};
+      const c = cases[caseId];
+      const isFl = getCasePipelineType(c) === "fl";
+      const s = (name) => {
+        if (name === "Court Downloading" || name === "Download Files") {
+          return b["Court Downloading"] || b["Download Files"] || "pending";
+        }
+        return b[name] || "pending";
+      };
+
+      if (isFl) {
+        return `
+          <div class="mini-pipeline-trail fl-trail">
+            <span class="m-step ${s('Navigate to URL')}" title="Court Portal (URL): ${s('Navigate to URL')}">🌐</span>
+            <span class="m-sep">›</span>
+            <span class="m-step ${s('Navigate to Search')}" title="Search Page: ${s('Navigate to Search')}">🔎</span>
+            <span class="m-sep">›</span>
+            <span class="m-step ${s('Search Case Number')}" title="Search Case: ${s('Search Case Number')}">🔢</span>
+            <span class="m-sep">›</span>
+            <span class="m-step ${s('Navigate to Files')}" title="Files / Docket: ${s('Navigate to Files')}">📁</span>
+            <span class="m-sep">›</span>
+            <span class="m-parallel-chip" title="Parallel Branch: Download (${s('Court Downloading')}), Obit (${s('Obituary Search')}), Deed (${s('Deed Search')})">
+              <span class="m-sub ${s('Court Downloading')}">📥</span>
+              <span class="m-sub ${s('Obituary Search')}">🕊️</span>
+              <span class="m-sub ${s('Deed Search')}">📜</span>
+            </span>
+            <span class="m-sep">›</span>
+            <span class="m-step ${s('Database Adding')}" title="Database Add: ${s('Database Adding')}">💾</span>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="mini-pipeline-trail">
+          <span class="m-step ${s('Precheck')}" title="Precheck: ${s('Precheck')}">🔍</span>
+          <span class="m-sep">›</span>
+          <span class="m-step ${s('Court Navigation')}" title="Court Nav: ${s('Court Navigation')}">🔐</span>
+          <span class="m-sep">›</span>
+          <span class="m-step ${s('Case Checking')}" title="Case Check: ${s('Case Checking')}">📋</span>
+          <span class="m-sep">›</span>
+          <span class="m-step ${s('File Picking')}" title="File Pick: ${s('File Picking')}">🎯</span>
+          <span class="m-sep">›</span>
+          <span class="m-parallel-chip" title="Parallel Branch: Download (${s('Court Downloading')}), Obit (${s('Obituary Search')}), Deed (${s('Deed Search')})">
+            <span class="m-sub ${s('Court Downloading')}">📥</span>
+            <span class="m-sub ${s('Obituary Search')}">🕊️</span>
+            <span class="m-sub ${s('Deed Search')}">📜</span>
+          </span>
+          <span class="m-sep">›</span>
+          <span class="m-step ${s('Database Adding')}" title="Database Add: ${s('Database Adding')}">💾</span>
+        </div>
+      `;
+    }
+
+    function updateRowMiniPipeline(caseId) {
+      const el = document.getElementById(`mini-pipe-${CSS.escape(caseId)}`);
+      if (!el) return;
+      const c = cases[caseId];
+      const blocks = caseBlocks[caseId] || (c && c.block_statuses) || deriveBlockStatuses(c);
+      const trailHtml = renderMiniPipelineTrail(caseId, blocks);
+      let barHtml = "";
+      if (c && c.progress) {
+        const num = parseFloat(c.progress);
+        if (!isNaN(num)) {
+          barHtml = `<div class="mini-progress"><div class="mini-progress-bar" style="width:${Math.min(100, num)}%"></div></div>`;
+        }
+      }
+      el.innerHTML = `${trailHtml}${barHtml}`;
+    }
+
+    function makeProgressCell(caseIdOrProgress, c) {
+      let caseId = null;
+      let caseObj = null;
+      let progressVal = "";
+
+      if (typeof caseIdOrProgress === "string" && c && typeof c === "object") {
+        caseId = caseIdOrProgress;
+        caseObj = c;
+        progressVal = c.progress || "";
+      } else {
+        progressVal = caseIdOrProgress || "";
+      }
+
+      let barHtml = "";
+      if (progressVal) {
+        const num = parseFloat(progressVal);
+        if (!isNaN(num)) {
+          barHtml = `<div class="mini-progress"><div class="mini-progress-bar" style="width:${Math.min(100, num)}%"></div></div>`;
+        }
+      }
+
+      if (caseId) {
+        const blocks = caseBlocks[caseId] || (caseObj && caseObj.block_statuses) || deriveBlockStatuses(caseObj);
+        const trailHtml = renderMiniPipelineTrail(caseId, blocks);
+        return `<div class="cell-pipeline-wrap" id="mini-pipe-${CSS.escape(caseId)}" onclick="event.stopPropagation(); selectAndShowPipeline('${caseId}')" title="Click to inspect this case in Case Execution Pipeline">${trailHtml}${barHtml}</div>`;
+      }
+
+      return barHtml || `<span style="font-size:11px;color:var(--text-dim)">${progressVal}</span>`;
+    }
+
+    function makeChangesCell(caseId, c) {
+      const newCount = (c.new_files || []).length;
+      const removedCount = (c.removed_files || []).length;
+      const total = newCount + removedCount;
+
+      if (!total) return `<span style="color:var(--text-dim)">—</span>`;
+
+      return `
+        <button class="btn-logs-col" onclick="event.stopPropagation(); openChangesModal('${caseId}')"
+          style="display:inline-flex;align-items:center;gap:5px;border-color:var(--border2)">
+          ${newCount ? `<span style="color:var(--success)">+${newCount}</span>` : ""}
+          ${removedCount ? `<span style="color:var(--danger)">-${removedCount}</span>` : ""}
+        </button>`;
+    }
+
+    function openChangesModal(caseId) {
+      const c = cases[caseId];
+      if (!c) return;
+      document.getElementById("changes-modal-title").textContent = `📝 Changes — ${caseId}`;
+
+      const newFiles = c.new_files || [];
+      const removedFiles = c.removed_files || [];
+
+      const newSection = document.getElementById("changes-new-section");
+      const removedSection = document.getElementById("changes-removed-section");
+      const newList = document.getElementById("changes-new-list");
+      const removedList = document.getElementById("changes-removed-list");
+
+      newSection.style.display = newFiles.length ? "block" : "none";
+      removedSection.style.display = removedFiles.length ? "block" : "none";
+
+      newList.innerHTML = newFiles.map(f => `
+        <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:4px;
+          padding:7px 10px;font-size:11px;display:flex;flex-direction:column;gap:2px">
+          <span style="color:var(--success);font-weight:500">+ ${f}</span>
+        </div>`).join("");
+
+      removedList.innerHTML = removedFiles.map(f => `
+        <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:4px;
+          padding:7px 10px;font-size:11px;display:flex;flex-direction:column;gap:2px">
+          <span style="color:var(--danger);font-weight:500">- ${f}</span>
+        </div>`).join("");
+
+      openModal("modal-changes");
+    }
+
+    function upsertRow(c) {
+      if (removedCases.has(c.case)) return;  // ← double guard
+      const tbody = document.getElementById("case-tbody");
+      const id = c.case;
+      let tr = document.getElementById(`row-${CSS.escape(id)}`);
+      const isNew = !tr;
+
+      if (isNew) {
+        tr = document.createElement("tr");
+        tr.id = `row-${CSS.escape(id)}`;
+        tbody.appendChild(tr);
+        tr.addEventListener("dblclick", () => openCaseLog(id));
+      }
+
+      const matchQ = searchQ && (
+        id.toLowerCase().includes(searchQ) ||
+        (c.county || "").toLowerCase().includes(searchQ) ||
+        (c.status || "").toLowerCase().includes(searchQ) ||
+        (c.address || "").toLowerCase().includes(searchQ) ||
+        (c.details || "").toLowerCase().includes(searchQ)
+      );
+
+      tr.className = [
+        selected.has(id) ? "selected" : "",
+        matchQ ? "highlighted" : "",
+      ].filter(Boolean).join(" ");
+
+      tr.innerHTML = `
+        <td><input type="checkbox" class="row-cb" data-id="${id}" ${selected.has(id) ? "checked" : ""} /></td>
+        <td style="font-weight:500;color:var(--text-hi);cursor:pointer" onclick="event.stopPropagation(); selectAndShowPipeline('${id}')" title="Click to inspect pipeline">${id}</td>
+        <td>${c.county || ""}</td>
+        <td>${makeStatusBadge(c.status, c.color)}</td>
+        <td style="font-size:11px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.address || ''}">${c.address || '<span style="color:var(--text-dim)">—</span>'}</td>
+        <td style="color:var(--text-dim);font-size:11px">${c.details || ""}</td>
+        <td>${makeChangesCell(id, c)}</td>
+        <td>
+          <div style="display:flex;gap:4px;align-items:center">
+            <button class="btn-logs-col" title="View Case Logs & Screenshots" onclick="event.stopPropagation(); openCaseLog('${id}')">📋 Logs</button>
+          </div>
+        </td>
+      `;
+      tr.querySelector(".row-cb").addEventListener("change", e => {
+        e.stopPropagation();
+        toggleSelect(id, e.target.checked);
+      });
+      tr.addEventListener("click", e => {
+        // if they clicked the checkbox directly, let the change event handle it
+        if (e.target.type === "checkbox") return;
+        // if they clicked the logs or changes button, don't select
+        if (e.target.tagName === "BUTTON") return;
+        // clicking a row updates the Case Execution Pipeline directly!
+        selectAndShowPipeline(id);
+        toggleSelect(id, !selected.has(id));
+      });
+
+      toggleEmptyState();
+    }
+
+    function renderTable() {
+      Object.values(cases).forEach(upsertRow);
+      toggleEmptyState();
+    }
+
+    function toggleEmptyState() {
+      const empty = Object.keys(cases).length === 0;
+      document.getElementById("empty-state").style.display = empty ? "flex" : "none";
+      document.getElementById("case-table").style.display = empty ? "none" : "table";
+    }
+
+    function toggleSelect(id, on) {
+      if (on) selected.add(id); else selected.delete(id);
+      const row = document.getElementById(`row-${CSS.escape(id)}`);
+      if (row) {
+        row.classList.toggle("selected", on);
+        const cb = row.querySelector(".row-cb");
+        if (cb) cb.checked = on;
+      }
+      updateSelectAll();
+    }
+
+    function updateSelectAll() {
+      const allIds = Object.keys(cases);
+      const sa = document.getElementById("select-all");
+      sa.indeterminate = selected.size > 0 && selected.size < allIds.length;
+      sa.checked = allIds.length > 0 && selected.size === allIds.length;
+    }
+
+    /* ════════════════════════════════════════════════════════════════════════════
+       LOG
+       ════════════════════════════════════════════════════════════════════════════ */
+    function logClass(line) {
+      if (/✅|completed|success/i.test(line)) return "success";
+      if (/❌|error|failed/i.test(line)) return "error";
+      if (/⚠️|warn|skip/i.test(line)) return "warn";
+      if (/➕|📁|📂|▶|⏹|⏭/i.test(line)) return "info";
+      return "";
+    }
+
+    function appendLogLine(line) {
+      const lb = document.getElementById("log-body");
+      const div = document.createElement("div");
+      div.className = `log-line ${logClass(line)}`;
+      div.textContent = line;
+      lb.appendChild(div);
+      // keep max 1000 lines in DOM
+      while (lb.children.length > 1000) lb.removeChild(lb.firstChild);
+      if (autoScroll) lb.scrollTop = lb.scrollHeight;
+    }
+
+    /* ════════════════════════════════════════════════════════════════════════════
+       UI STATE HELPERS
+       ════════════════════════════════════════════════════════════════════════════ */
+    function setConnected(on) {
+      document.getElementById("conn-dot").className = `status-dot ${on ? "running" : "error"}`;
+      document.getElementById("conn-label").textContent = on ? "Connected" : "Disconnected";
+    }
+
+    function setProgress(v) {
+      document.getElementById("global-progress-bar").style.width = `${Math.min(100, v * 100)}%`;
+    }
+
+    function setStatusText(t) {
+      document.getElementById("status-text-footer").textContent = t;
+    }
+
+    function recalcProgress() {
+      const allCases = Object.values(cases);
+      const total = allCases.length;
+      if (total === 0) { setProgress(0); return; }
+      const done = allCases.filter(c =>
+        /completed|error|skipped|not found/i.test(c.status || "")
+      ).length;
+      setProgress(done / total);
+    }
+
+
+    function setRunning(on) {
+      isRunning = on;
+      document.getElementById("btn-start").disabled = on;
+      document.getElementById("btn-stop").disabled = !on;
+      const dot = document.getElementById("conn-dot");
+      if (on) dot.classList.add("running"); else dot.classList.remove("running");
+    }
+
+    function updateCounts() {
+      const total = Object.keys(cases).length;
+      const done = Object.values(cases).filter(c => /completed/i.test(c.status)).length;
+      const errors = Object.values(cases).filter(c => /error/i.test(c.status)).length;
+      document.getElementById("queue-count").textContent = `${total} cases`;
+      document.getElementById("footer-counts").textContent =
+        `${done} done · ${errors} errors · ${total - done - errors} pending`;
+      recalcProgress();  // ← added
+    }
+
+    // applySettings defined earlier
+
+    /* ════════════════════════════════════════════════════════════════════════════
+       TOAST
+       ════════════════════════════════════════════════════════════════════════════ */
+    function toast(msg, type = "info", ms = 3000) {
+      const c = document.getElementById("toast-container");
+      const el = document.createElement("div");
+      el.className = `toast ${type}`;
+      el.textContent = msg;
+      c.appendChild(el);
+      setTimeout(() => el.remove(), ms);
+    }
+
+    /* ════════════════════════════════════════════════════════════════════════════
+       MODAL
+       ════════════════════════════════════════════════════════════════════════════ */
+    function openModal(id) { document.getElementById(id).classList.add("open"); }
+    function closeModal(id) { document.getElementById(id).classList.remove("open"); }
+
+    document.querySelectorAll("[data-close]").forEach(btn => {
+      btn.addEventListener("click", () => closeModal(btn.dataset.close));
+    });
+    document.querySelectorAll(".modal-backdrop").forEach(bd => {
+      bd.addEventListener("click", e => { if (e.target === bd) closeModal(bd.id); });
+    });
+
+    /* ════════════════════════════════════════════════════════════════════════════
+       BUTTON HANDLERS
+       ════════════════════════════════════════════════════════════════════════════ */
+
+    // ── File Upload ──────────────────────────────────────────────────────────────
+    const dz = document.getElementById("drop-zone");
+    const fileInput = document.getElementById("file-input");
+
+    dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("drag-over"); });
+    dz.addEventListener("dragleave", () => dz.classList.remove("drag-over"));
+    dz.addEventListener("drop", e => {
+      e.preventDefault();
+      dz.classList.remove("drag-over");
+      const f = e.dataTransfer.files[0];
+      if (f) uploadFile(f);
+    });
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files[0]) uploadFile(fileInput.files[0]);
+    });
+
+    async function uploadFile(file) {
+      document.getElementById("dz-name").textContent = `Uploading ${file.name}…`;
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await r.json();
+      if (data.ok) {
+        // Auto-set batch name from filename
+        const baseName = file.name.replace(/\.[^.]+$/, '');
+        document.getElementById("batch-name").value = baseName;
+        document.getElementById("dz-name").textContent = `✅ ${file.name} (Batch: ${baseName})`;
+        toast(`Loaded ${file.name}`, "success");
+      } else {
+        document.getElementById("dz-name").textContent = `❌ ${data.error}`;
+        toast(data.error, "error");
+      }
+    }
+
+    // ── Output folder ─────────────────────────────────────────────────────────────
+    document.getElementById("btn-set-output").addEventListener("click", async () => {
+      const folder = document.getElementById("output-folder").value.trim();
+      if (!folder) return toast("Enter a folder path", "warn");
+      const r = await api("POST", "/api/output-folder", { folder });
+      if (r.ok) toast("Output folder set", "success");
+      else toast(r.error, "error");
+    });
+
+    // ── Save settings ─────────────────────────────────────────────────────────────
+    document.getElementById("btn-save-settings").addEventListener("click", async () => {
+      const body = {
+        keywords: document.getElementById("keywords").value,
+        unwanted_keywords: document.getElementById("unwanted-keywords").value,
+        headless_mode: document.getElementById("headless-mode").checked,
+        max_workers: document.getElementById("max-workers").value,
+        output_folder: document.getElementById("output-folder").value,
+        skip_closed_cases: document.getElementById("skip-closed-cases").checked,
+        skip_business: document.getElementById("skip-business").checked,
+        llm_service: document.getElementById("llm-service") ? document.getElementById("llm-service").value : "groq",
+        llm_api_key: document.getElementById("llm-api-key") ? document.getElementById("llm-api-key").value.trim() : "",
+        llm_model: document.getElementById("llm-model") ? document.getElementById("llm-model").value.trim() : "",
+      };
+      const r = await api("POST", "/api/settings", body);
+      if (r.ok) toast("Settings saved", "success");
+    });
+
+    const btnSaveLlm = document.getElementById("btn-save-llm-settings");
+    if (btnSaveLlm) {
+      btnSaveLlm.addEventListener("click", async () => {
+        const body = {
+          llm_service: document.getElementById("llm-service").value,
+          llm_api_key: document.getElementById("llm-api-key").value.trim(),
+          llm_model: document.getElementById("llm-model").value.trim(),
+        };
+        const r = await api("POST", "/api/settings", body);
+        if (r.ok) toast("AI / LLM settings saved", "success");
+        else toast("Failed to save AI settings", "error");
+      });
+    }
+
+    // ── Immediate Headless Mode toggle ──────────────────────────────────────────
+    const hmCheckbox = document.getElementById("headless-mode");
+    if (hmCheckbox) {
+      hmCheckbox.addEventListener("change", async () => {
+        const isHeadless = hmCheckbox.checked;
+        const r = await api("POST", "/api/settings", { headless_mode: isHeadless });
+        if (r.ok) {
+          toast(`Browser mode: ${isHeadless ? "Headless (Hidden)" : "Headful (Visible browser)"}`, "info");
+        }
+      });
+    }
+
+    // ── Start / Stop / Skip ────────────────────────────────────────────────────────
+    document.getElementById("btn-start").addEventListener("click", async () => {
+      const isHeadless = document.getElementById("headless-mode") ? document.getElementById("headless-mode").checked : false;
+      const r = await api("POST", "/api/start", { headless_mode: isHeadless });
+      if (r.error) toast(r.error, "error");
+    });
+    document.getElementById("btn-stop").addEventListener("click", async () => {
+      await api("POST", "/api/stop");
+    });
+    document.getElementById("btn-skip").addEventListener("click", async () => {
+      const sel = [...selected];
+      if (sel.length === 0) {
+        toast("Select a case to skip", "warn");
+        return;
+      }
+      // Send all selected cases, not just the first one
+      for (const case_id of sel) {
+        await api("POST", "/api/skip", { case_id });
+      }
+      toast(`Skip requested for ${sel.length} case(s)`, "info");
+    });
+
+    document.getElementById("btn-view-report").addEventListener("click", () => {
+      if (lastReport) { renderReport(lastReport); openModal("modal-report"); }
+    });
+
+    // ── Download Batch Folder ────────────────────────────────────────────────────
+    document.getElementById("btn-download-batch").addEventListener("click", async () => {
+      const btn = document.getElementById("btn-download-batch");
+      const orig = btn.textContent;
+      btn.textContent = "⏳ Zipping…";
+      btn.disabled = true;
+      try {
+        const res = await fetch("/api/download-batch-folder");
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: "Unknown error" }));
+          toast(err.error || "Download failed", "error");
+          return;
+        }
+        // Trigger browser file-save dialog
+        const blob = await res.blob();
+        const cd = res.headers.get("Content-Disposition") || "";
+        const nameMatch = cd.match(/filename="?([^"]+)"?/);
+        const fname = nameMatch ? nameMatch[1] : "batch_folder.zip";
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fname;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast("Batch folder downloaded", "success");
+      } catch (e) {
+        toast("Download error: " + e.message, "error");
+      } finally {
+        btn.textContent = orig;
+        btn.disabled = false;
+      }
+    });
+
+
+    document.getElementById("btn-add-case").addEventListener("click", () => {
+      document.getElementById("modal-case-number").value = "";
+      document.getElementById("modal-error").textContent = "";
+      openModal("modal-add");
+      setTimeout(() => document.getElementById("modal-case-number").focus(), 50);
+    });
+
+    document.getElementById("btn-modal-add").addEventListener("click", async () => {
+      const county = document.getElementById("modal-county").value;
+      const caseNo = document.getElementById("modal-case-number").value.trim();
+      if (!caseNo) {
+        document.getElementById("modal-error").textContent = "⚠️ Please enter a case number.";
+        return;
+      }
+      const r = await api("POST", "/api/cases/add", { county, case_number: caseNo });
+      if (r.ok) {
+        closeModal("modal-add");
+        toast(`Added ${r.case_id}`, "success");
+      } else {
+        document.getElementById("modal-error").textContent = `⚠️ ${r.error}`;
+      }
+    });
+
+    document.getElementById("modal-case-number").addEventListener("keydown", e => {
+      if (e.key === "Enter") document.getElementById("btn-modal-add").click();
+    });
+
+    // ── Remove selected ──────────────────────────────────────────────────────────
+    document.getElementById("btn-remove-selected").addEventListener("click", async () => {
+      if (selected.size === 0) return toast("No cases selected", "warn");
+      const r = await api("POST", "/api/cases/remove", { case_ids: [...selected] });
+      if (r.ok) {
+        selected.clear();
+        toast(`Removed ${r.removed} case(s)`, "success");
+      } else {
+        toast(r.error, "error");
+      }
+    });
+
+    // ── Clear all ────────────────────────────────────────────────────────────────
+    document.getElementById("btn-clear-cases").addEventListener("click", async () => {
+      if (!Object.keys(cases).length) return;
+      await api("POST", "/api/cases/clear");
+      toast("Case list cleared", "info");
+    });
+
+    // ── Select all checkbox ───────────────────────────────────────────────────────
+    document.getElementById("select-all").addEventListener("change", e => {
+      const allIds = Object.keys(cases);
+      if (e.target.checked) allIds.forEach(id => toggleSelect(id, true));
+      else allIds.forEach(id => toggleSelect(id, false));
+    });
+
+    // ── Log controls ─────────────────────────────────────────────────────────────
+    document.getElementById("btn-load-range").addEventListener("click", async () => {
+      const year = document.getElementById("range-year").value.trim();
+      const from = parseInt(document.getElementById("range-from").value.trim());
+      const to = parseInt(document.getElementById("range-to").value.trim());
+      const county = document.getElementById("range-county").value;
+      const statusEl = document.getElementById("range-status");
+
+      if (!year || isNaN(from) || isNaN(to)) {
+        return toast("Fill in year, from, and to", "warn");
+      }
+      if (from > to) {
+        return toast("'From' must be less than 'To'", "warn");
+      }
+      if (to - from > 10000) {
+        return toast("Range too large (max 10,000)", "warn");
+      }
+
+      statusEl.textContent = `Loading ${to - from + 1} cases...`;
+      const btn = document.getElementById("btn-load-range");
+      btn.disabled = true;
+
+      const r = await api("POST", "/api/cases/load-range", {
+        year, from, to, county
+      });
+
+      btn.disabled = false;
+      if (r.ok) {
+        statusEl.textContent = `✅ Loaded ${r.count} cases`;
+        toast(`Loaded ${r.count} cases`, "success");
+      } else {
+        statusEl.textContent = `❌ ${r.error}`;
+        toast(r.error, "error");
+      }
+    });
+    document.getElementById("btn-clear-log").addEventListener("click", () => api("POST", "/api/log/clear"));
+    document.getElementById("btn-copy-log").addEventListener("click", () => {
+      const text = [...document.getElementById("log-body").querySelectorAll(".log-line")]
+        .map(l => l.textContent).join("\n");
+      navigator.clipboard.writeText(text).then(() => toast("Log copied", "success"));
+    });
+    document.getElementById("btn-autoscroll").addEventListener("click", function () {
+      autoScroll = !autoScroll;
+      this.style.color = autoScroll ? "var(--accent)" : "var(--text-dim)";
+    });
+
+    // ── Log resize handle ─────────────────────────────────────────────────────────
+    (function () {
+      const handle = document.getElementById("log-resize");
+      const panel = document.getElementById("log-panel");
+      let dragging = false, startY, startH;
+      handle.addEventListener("mousedown", e => {
+        dragging = true; startY = e.clientY; startH = panel.offsetHeight;
+        document.body.style.userSelect = "none";
+      });
+      document.addEventListener("mousemove", e => {
+        if (!dragging) return;
+        const delta = startY - e.clientY;
+        panel.style.height = Math.max(80, Math.min(500, startH + delta)) + "px";
+      });
+      document.addEventListener("mouseup", () => {
+        dragging = false;
+        document.body.style.userSelect = "";
+      });
+    })();
+
+    // ── Search ────────────────────────────────────────────────────────────────────
+    document.getElementById("search-input").addEventListener("input", function () {
+      searchQ = this.value.trim().toLowerCase();
+      // re-render highlights
+      Object.keys(cases).forEach(id => {
+        const c = cases[id];
+        const row = document.getElementById(`row-${CSS.escape(id)}`);
+        if (!row) return;
+        const match = searchQ && (
+          id.toLowerCase().includes(searchQ) ||
+          (c.county || "").toLowerCase().includes(searchQ) ||
+          (c.status || "").toLowerCase().includes(searchQ) ||
+          (c.details || "").toLowerCase().includes(searchQ)
+        );
+        row.classList.toggle("highlighted", match);
+      });
+    });
+
+    document.addEventListener("keydown", e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+        e.preventDefault();
+        document.getElementById("search-input").focus();
+      }
+      if (e.key === "Escape") {
+        document.getElementById("search-input").value = "";
+        searchQ = "";
+        document.querySelectorAll("tr.highlighted").forEach(r => r.classList.remove("highlighted"));
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "c" && selected.size > 0 && document.activeElement.tagName !== "INPUT") {
+        const lines = [...selected].map(id => {
+          const c = cases[id];
+          return [c.case, c.county, c.status, c.address || "", c.details].join("\t");
+        });
+        navigator.clipboard.writeText(lines.join("\n")).then(() => toast("Copied", "success"));
+      }
+      if (e.key === "Delete" && selected.size > 0 && document.activeElement.tagName !== "INPUT") {
+        document.getElementById("btn-remove-selected").click();
+      }
+    });
+
+    // ── Sort columns ─────────────────────────────────────────────────────────────
+    document.querySelectorAll("#case-table thead th[data-col]").forEach(th => {
+      th.addEventListener("click", () => {
+        const col = th.dataset.col;
+        if (sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = 1; }
+        const tbody = document.getElementById("case-tbody");
+        const rows = [...tbody.querySelectorAll("tr")];
+        rows.sort((a, b) => {
+          const ai = a.id.replace("row-", "");
+          const bi = b.id.replace("row-", "");
+          const av = (cases[ai]?.[col] || "").toString().toLowerCase();
+          const bv = (cases[bi]?.[col] || "").toString().toLowerCase();
+          return av < bv ? -sortDir : av > bv ? sortDir : 0;
+        });
+        rows.forEach(r => tbody.appendChild(r));
+      });
+    });
+
+    // ── Keyboard delete in modal ──────────────────────────────────────────────────
+    document.getElementById("modal-add").addEventListener("keydown", e => {
+      if (e.key === "Escape") closeModal("modal-add");
+    });
+
+    /* ════════════════════════════════════════════════════════════════════════════
+       CASE LOG + SCREENSHOT TIMELINE OVERLAY
+       ════════════════════════════════════════════════════════════════════════════ */
+    let activeCaseLog = null;
+    let caseLogTimeline = [];  // array of {file, ts}
+    let caseLogStartTime = null;  // ts of first log line
+
+    function openCaseLog(caseId) {
+      activeCaseLog = caseId;
+      caseLogTimeline = [];
+      caseLogStartTime = null;
+
+      const overlay = document.getElementById("case-log-overlay");
+      const logsEl = document.getElementById("clo-logs");
+      const timelineEl = document.getElementById("clo-timeline");
+      const previewEl = document.getElementById("clo-preview");
+      const noImg = document.getElementById("clo-no-screenshot");
+      const searchEl = document.getElementById("clo-search");
+      const searchCount = document.getElementById("clo-search-count");
+
+      // Reset
+      logsEl.innerHTML = "";
+      timelineEl.innerHTML = "";
+      previewEl.style.display = "none";
+      noImg.style.display = "flex";
+      searchEl.value = "";
+      searchCount.textContent = "";
+      document.getElementById("clo-title").textContent = `📋 ${caseId}`;
+
+      overlay.classList.add("open");
+      updateN8nStage(caseId);
+
+      // Fetch saved block statuses from server if available
+      fetch(`/api/cases/${encodeURIComponent(caseId)}/blocks`)
+        .then(r => r.json())
+        .then(b => {
+          if (b && Object.keys(b).length > 0) {
+            caseBlocks[caseId] = Object.assign(caseBlocks[caseId] || {}, b);
+            updateN8nStage(caseId);
+          }
+        })
+        .catch(() => { });
+
+      // Fetch existing logs
+      fetch(`/api/cases/${encodeURIComponent(caseId)}/logs`)
+        .then(r => r.json())
+        .then(lines => {
+          lines.forEach(line => _appendCaseLogLine(logsEl, line));
+          logsEl.scrollTop = logsEl.scrollHeight;
+        })
+        .catch(() => { });
+
+      // Fetch screenshot timeline
+      fetch(`/api/cases/${encodeURIComponent(caseId)}/screenshots`)
+        .then(r => r.json())
+        .then(shots => {
+          if (Array.isArray(shots) && shots.length > 0) {
+            noImg.style.display = "none";
+            shots.forEach(s => _addTimelineThumb(s));
+            // Show last screenshot in preview
+            _showPreview(shots[shots.length - 1]);
+          }
+        })
+        .catch(() => { });
+    }
+
+    function closeCaseLog() {
+      activeCaseLog = null;
+      document.getElementById("case-log-overlay").classList.remove("open");
+    }
+
+    /* ════════════════════════════════════════════════════════════════════════════
+       N8N WORKFLOW PIPELINE RENDERING (Main Dashboard)
+       ════════════════════════════════════════════════════════════════════════════ */
+    let currentPipelineCaseId = null;
+
+    function blockNameToId(name) {
+      switch (name) {
+        case "Precheck": return "precheck";
+        case "Court Navigation": return "nav";
+        case "Case Checking": return "check";
+        case "File Picking": return "picking";
+        case "Navigate to URL": return "fl-url";
+        case "Navigate to Search": return "fl-search";
+        case "Search Case Number": return "fl-case";
+        case "Navigate to Files": return "fl-files";
+        case "Court Downloading":
+        case "Download Files": return "download";
+        case "Obituary Search": return "obituary";
+        case "Deed Search": return "deed";
+        case "Database Adding": return "database";
+        default: return "";
+      }
+    }
+
+    function selectAndShowPipeline(caseId) {
+      if (!caseId) return;
+      currentPipelineCaseId = caseId;
+      updateN8nStage(caseId);
+      const panel = document.getElementById("main-pipeline-section");
+      if (panel) {
+        if (panel.classList.contains("collapsed")) {
+          panel.classList.remove("collapsed");
+          const toggleBtn = document.getElementById("main-pipeline-toggle");
+          if (toggleBtn) toggleBtn.textContent = "▲ Collapse";
+        }
+        setTimeout(() => updateN8nStage(caseId), 50);
+        panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
+
+    function updateN8nStage(caseId) {
+      if (caseId) currentPipelineCaseId = caseId;
+      const effectiveId = currentPipelineCaseId;
+      const c = effectiveId ? cases[effectiveId] : null;
+      const isFl = getCasePipelineType(c) === "fl";
+      const blocks = (effectiveId && caseBlocks[effectiveId]) || (c && c.block_statuses) || deriveBlockStatuses(c);
+
+      // Update main dashboard tags
+      const mainCaseTag = document.getElementById("main-pipeline-active-case");
+      const mainStatusTag = document.getElementById("main-pipeline-status");
+      const mainModeTag = document.getElementById("main-pipeline-mode-badge");
+
+      if (mainCaseTag) {
+        mainCaseTag.textContent = effectiveId ? `Case: ${effectiveId}` : "No Case Selected";
+      }
+      if (mainStatusTag) {
+        mainStatusTag.textContent = c ? (c.status || "Idle") : "Idle";
+      }
+      if (mainModeTag) {
+        if (isFl) {
+          const countyStr = (c && c.county) ? c.county : (document.getElementById("range-county")?.value || "Florida");
+          mainModeTag.textContent = `⚡ Florida Pipeline (${countyStr})`;
+          mainModeTag.style.color = "#f59e0b";
+          mainModeTag.style.borderColor = "rgba(245, 158, 11, 0.4)";
+          mainModeTag.style.background = "rgba(245, 158, 11, 0.12)";
+        } else {
+          mainModeTag.textContent = "⚡ NJ Pipeline";
+          mainModeTag.style.color = "var(--accent)";
+          mainModeTag.style.borderColor = "rgba(0, 212, 170, 0.3)";
+          mainModeTag.style.background = "rgba(0, 212, 170, 0.08)";
+        }
+      }
+
+      // Toggle visible columns between NJ and FL
+      document.querySelectorAll(".nj-pipeline-col").forEach(el => {
+        el.style.display = isFl ? "none" : "flex";
+      });
+      document.querySelectorAll(".fl-pipeline-col").forEach(el => {
+        el.style.display = isFl ? "flex" : "none";
+      });
+
+      // Update node cards on main dashboard stage
+      const activeBlocks = isFl ? FL_PIPELINE_BLOCKS : NJ_PIPELINE_BLOCKS;
+      activeBlocks.forEach(blockName => {
+        const nodeId = "mnode-" + blockNameToId(blockName);
+        const nodeEl = document.getElementById(nodeId);
+        if (!nodeEl) return;
+        let st = blocks[blockName] || "pending";
+        if (blockName === "Court Downloading" && !blocks[blockName] && blocks["Download Files"]) {
+          st = blocks["Download Files"];
+        }
+        nodeEl.className = `n8n-node ${st}`;
+        const badge = nodeEl.querySelector(".node-status-badge");
+        if (badge) {
+          badge.className = `node-status-badge ${st}`;
+          badge.textContent = st;
+        }
+      });
+
+      requestAnimationFrame(() => {
+        drawConnectionsForCanvas("main-n8n-canvas-wrap", "main-n8n-svg-layer", "mnode-", blocks, isFl);
+      });
+    }
+
+    function drawConnectionsForCanvas(canvasId, svgId, prefix, blocks, isFl) {
+      const canvas = document.getElementById(canvasId);
+      const svg = document.getElementById(svgId);
+      if (!canvas || !svg) return;
+
+      const cRect = canvas.getBoundingClientRect();
+      if (cRect.width === 0 || cRect.height === 0) return;
+
+      const scrollL = canvas.scrollLeft;
+      const scrollT = canvas.scrollTop;
+      const totalW = Math.max(canvas.scrollWidth, cRect.width);
+      const totalH = Math.max(canvas.scrollHeight, cRect.height);
+
+      svg.setAttribute("width", totalW);
+      svg.setAttribute("height", totalH);
+      svg.style.width = totalW + "px";
+      svg.style.height = totalH + "px";
+
+      const blkState = blocks || {};
+
+      const wires = isFl ? [
+        { from: prefix + "fl-url", to: prefix + "fl-search", fromBlk: "Navigate to URL", toBlk: "Navigate to Search" },
+        { from: prefix + "fl-search", to: prefix + "fl-case", fromBlk: "Navigate to Search", toBlk: "Search Case Number" },
+        { from: prefix + "fl-case", to: prefix + "fl-files", fromBlk: "Search Case Number", toBlk: "Navigate to Files" },
+        { from: prefix + "fl-files", to: prefix + "download", fromBlk: "Navigate to Files", toBlk: "Court Downloading" },
+        { from: prefix + "fl-files", to: prefix + "obituary", fromBlk: "Navigate to Files", toBlk: "Obituary Search" },
+        { from: prefix + "fl-files", to: prefix + "deed", fromBlk: "Navigate to Files", toBlk: "Deed Search" },
+        { from: prefix + "download", to: prefix + "database", fromBlk: "Court Downloading", toBlk: "Database Adding" },
+        { from: prefix + "obituary", to: prefix + "database", fromBlk: "Obituary Search", toBlk: "Database Adding" },
+        { from: prefix + "deed", to: prefix + "database", fromBlk: "Deed Search", toBlk: "Database Adding" },
+      ] : [
+        { from: prefix + "precheck", to: prefix + "nav", fromBlk: "Precheck", toBlk: "Court Navigation" },
+        { from: prefix + "nav", to: prefix + "check", fromBlk: "Court Navigation", toBlk: "Case Checking" },
+        { from: prefix + "check", to: prefix + "picking", fromBlk: "Case Checking", toBlk: "File Picking" },
+        { from: prefix + "picking", to: prefix + "download", fromBlk: "File Picking", toBlk: "Court Downloading" },
+        { from: prefix + "picking", to: prefix + "obituary", fromBlk: "File Picking", toBlk: "Obituary Search" },
+        { from: prefix + "picking", to: prefix + "deed", fromBlk: "File Picking", toBlk: "Deed Search" },
+        { from: prefix + "download", to: prefix + "database", fromBlk: "Court Downloading", toBlk: "Database Adding" },
+        { from: prefix + "obituary", to: prefix + "database", fromBlk: "Obituary Search", toBlk: "Database Adding" },
+        { from: prefix + "deed", to: prefix + "database", fromBlk: "Deed Search", toBlk: "Database Adding" },
+      ];
+
+      let markers = `
+        <defs>
+          <marker id="${prefix}arr-pending" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L6,3 z" fill="#334155" />
+          </marker>
+          <marker id="${prefix}arr-ready" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L6,3 z" fill="#475569" />
+          </marker>
+          <marker id="${prefix}arr-running" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L6,3 z" fill="#00d4aa" />
+          </marker>
+          <marker id="${prefix}arr-success" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L6,3 z" fill="#22c55e" />
+          </marker>
+          <marker id="${prefix}arr-failed" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L6,3 z" fill="#ff4757" />
+          </marker>
+        </defs>
+      `;
+
+      const getStatus = (blkName) => {
+        if (blkName === "Court Downloading" || blkName === "Download Files") {
+          return blkState["Court Downloading"] || blkState["Download Files"] || "pending";
+        }
+        return blkState[blkName] || "pending";
+      };
+
+      let paths = "";
+      wires.forEach(w => {
+        const fNode = document.getElementById(w.from);
+        const tNode = document.getElementById(w.to);
+        if (!fNode || !tNode) return;
+
+        const outPort = fNode.querySelector(".node-port.out") || fNode;
+        const inPort = tNode.querySelector(".node-port.in") || tNode;
+
+        const r1 = outPort.getBoundingClientRect();
+        const r2 = inPort.getBoundingClientRect();
+
+        const x1 = (r1.left + r1.width / 2) - cRect.left + scrollL;
+        const y1 = (r1.top + r1.height / 2) - cRect.top + scrollT;
+        const x2 = (r2.left + r2.width / 2) - cRect.left + scrollL;
+        const y2 = (r2.top + r2.height / 2) - cRect.top + scrollT;
+
+        const dx = Math.max(28, Math.abs(x2 - x1) * 0.45);
+        const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+
+        const sFrom = getStatus(w.fromBlk);
+        const sTo = getStatus(w.toBlk);
+
+        let wireCls = "n8n-wire-pending";
+        let markerId = `${prefix}arr-pending`;
+
+        if (sTo === "running") {
+          wireCls = "n8n-wire-running";
+          markerId = `${prefix}arr-running`;
+        } else if (sTo === "success") {
+          wireCls = "n8n-wire-success";
+          markerId = `${prefix}arr-success`;
+        } else if (sTo === "failed") {
+          wireCls = "n8n-wire-failed";
+          markerId = `${prefix}arr-failed`;
+        } else if (sFrom === "success") {
+          wireCls = "n8n-wire-ready";
+          markerId = `${prefix}arr-ready`;
+        }
+
+        paths += `<path d="${d}" class="n8n-wire ${wireCls}" marker-end="url(#${markerId})" />`;
+      });
+
+      svg.innerHTML = markers + paths;
+    }
+
+    // Toggle collapse/expand on main dashboard pipeline panel
+    const mainPipeToggleBtn = document.getElementById("main-pipeline-toggle");
+    if (mainPipeToggleBtn) {
+      mainPipeToggleBtn.addEventListener("click", () => {
+        const panel = document.getElementById("main-pipeline-section");
+        const isCollapsed = panel.classList.toggle("collapsed");
+        mainPipeToggleBtn.textContent = isCollapsed ? "▼ Expand" : "▲ Collapse";
+        if (!isCollapsed) {
+          setTimeout(() => updateN8nStage(currentPipelineCaseId), 60);
+        }
+      });
+    }
+
+    // Clicking any node filters logs or copies search
+    document.querySelectorAll(".n8n-node").forEach(node => {
+      node.addEventListener("click", () => {
+        const blockName = node.getAttribute("data-block");
+        if (activeCaseLog) {
+          const searchEl = document.getElementById("clo-search");
+          if (searchEl && blockName) {
+            searchEl.value = blockName;
+            searchEl.dispatchEvent(new Event("input"));
+          }
+        } else {
+          const searchInput = document.getElementById("search-input");
+          if (searchInput && blockName) {
+            searchInput.value = blockName;
+            searchInput.dispatchEvent(new Event("input"));
+          }
+        }
+      });
+    });
+
+    // Window resize and canvas scroll update connection lines
+    window.addEventListener("resize", () => {
+      updateN8nStage(currentPipelineCaseId);
+    });
+
+    ["main-n8n-canvas-wrap", "n8n-canvas-wrap"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener("scroll", () => {
+          updateN8nStage(currentPipelineCaseId);
+        });
+      }
+    });
+
+    // Automatically initialize N8N stage immediately on load
+    window.addEventListener("load", () => {
+      setTimeout(() => updateN8nStage(null), 100);
+      setTimeout(() => updateN8nStage(null), 500);
+    });
+    setTimeout(() => updateN8nStage(null), 150);
+
+    // Update pipeline preview when user changes county in sidebar
+    document.getElementById("range-county")?.addEventListener("change", () => {
+      if (!currentPipelineCaseId || !cases[currentPipelineCaseId]) {
+        updateN8nStage(null);
+      }
+    });
+
+
+    // ── Reset All (complete reset) ──────────────────────────────────────────────
+    document.getElementById("btn-reset-all").addEventListener("click", async () => {
+      // Confirm with user before resetting
+      if (!confirm("⚠️ This will remove ALL cases and reset the entire state.\n\nAre you sure you want to continue?")) {
+        return;
+      }
+
+      try {
+        const r = await api("POST", "/api/reset-all");
+        if (r.ok) {
+          // Clear client-side state
+          Object.keys(cases).forEach(k => delete cases[k]);
+          selected.clear();
+          removedCases.clear();
+          document.getElementById("case-tbody").innerHTML = "";
+          document.getElementById("case-table").style.display = "none";
+          document.getElementById("empty-state").style.display = "flex";
+
+          // Reset UI elements
+          document.getElementById("dz-name").textContent = "";
+          document.getElementById("batch-name").value = "";
+          document.getElementById("output-folder").value = "";
+          document.getElementById("search-input").value = "";
+          searchQ = "";
+
+          // Hide summary panel
+          document.getElementById("summary-panel").classList.remove("open");
+
+          // Reset progress
+          setProgress(0);
+          setStatusText("Idle");
+
+          // Reset counts
+          updateCounts();
+
+          // Clear report
+          lastReport = null;
+          document.getElementById("btn-view-report").disabled = true;
+          document.getElementById("btn-download-batch").style.display = "none";
+
+          toast("🔄 Everything reset successfully", "success");
+        } else {
+          toast(r.error || "Reset failed", "error");
+        }
+      } catch (e) {
+        toast("Error during reset: " + e.message, "error");
+      }
+    });
+
+    // ── Application Restart (Shutdown & Rerun main.py) ──────────────────────────
+    function showRestartingOverlay() {
+      const modal = document.getElementById("modal-restarting");
+      if (modal) modal.classList.add("open");
+
+      const timerEl = document.getElementById("restart-timer");
+      const mainStatusEl = document.getElementById("restart-status-main");
+      const subStatusEl = document.getElementById("restart-status-sub");
+
+      let startTime = Date.now();
+      let timerInterval = setInterval(() => {
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        if (timerEl) {
+          timerEl.textContent = `Attempting to reconnect (${elapsed}s elapsed)...`;
+        }
+      }, 1000);
+
+      // Start polling after a 2-second grace period for process to bounce
+      setTimeout(() => {
+        const pollInterval = setInterval(async () => {
+          try {
+            const resp = await fetch("/api/state?_t=" + Date.now(), { cache: "no-store" });
+            if (resp.ok) {
+              clearInterval(pollInterval);
+              clearInterval(timerInterval);
+              if (mainStatusEl) mainStatusEl.textContent = "✅ Server is back online!";
+              if (subStatusEl) subStatusEl.textContent = "Reloading interface...";
+              if (timerEl) timerEl.textContent = "Reconnected successfully!";
+              setTimeout(() => {
+                window.location.reload();
+              }, 600);
+            }
+          } catch (e) {
+            // Server still rebooting, keep waiting
+          }
+        }, 1000);
+      }, 2000);
+    }
+
+    async function triggerAppRestart() {
+      if (!confirm("⚡ RERUN APPLICATION\n\nThis will completely shut down all active browser windows, scrapers, and background tasks, then restart the entire Python app from scratch (as if you closed and reran main.py).\n\nDo you want to continue?")) {
+        return;
+      }
+
+      showRestartingOverlay();
+
+      try {
+        const res = await api("POST", "/api/restart");
+        if (!res.ok) {
+          toast(res.error || "Failed to trigger restart", "error");
+        }
+      } catch (err) {
+        console.log("Restart request dispatched:", err);
+      }
+    }
+
+    document.getElementById("btn-restart-app")?.addEventListener("click", triggerAppRestart);
+    document.getElementById("btn-restart-app-side")?.addEventListener("click", triggerAppRestart);
+
+    function _addTimelineThumb(entry) {
+      caseLogTimeline.push(entry);
+      const timelineEl = document.getElementById("clo-timeline");
+      const noImg = document.getElementById("clo-no-screenshot");
+      noImg.style.display = "none";
+
+      const div = document.createElement("div");
+      div.className = "timeline-thumb";
+      div.dataset.ts = entry.ts;
+
+      const img = document.createElement("img");
+      img.src = `/api/screenshot/${entry.file}`;
+      img.loading = "lazy";
+      div.appendChild(img);
+
+      const label = document.createElement("span");
+      label.className = "ts-label";
+      const d = new Date(entry.ts * 1000);
+      label.textContent = d.toLocaleTimeString();
+      div.appendChild(label);
+
+      div.addEventListener("click", () => _showPreview(entry));
+      timelineEl.appendChild(div);
+
+      // Auto-scroll timeline to bottom
+      timelineEl.scrollTop = timelineEl.scrollHeight;
+    }
+
+    function _showPreview(entry) {
+      const previewEl = document.getElementById("clo-preview");
+      previewEl.src = `/api/screenshot/${entry.file}`;
+      previewEl.style.display = "block";
+
+      // Highlight active thumb
+      document.querySelectorAll(".timeline-thumb").forEach(t => {
+        t.classList.toggle("active", parseFloat(t.dataset.ts) === entry.ts);
+      });
+    }
+
+    function _appendCaseLogLine(container, text) {
+      const div = document.createElement("div");
+      div.className = `log-line ${logClass(text)}`;
+      div.textContent = text;
+      div.dataset.ts = Date.now() / 1000;
+      container.appendChild(div);
+      while (container.children.length > 2000) container.removeChild(container.firstChild);
+    }
+
+    // Live log streaming
+    socket.on("driver_log", ({ case_id, line }) => {
+      if (activeCaseLog && case_id === activeCaseLog) {
+        const logsEl = document.getElementById("clo-logs");
+        _appendCaseLogLine(logsEl, line);
+        const q = document.getElementById("clo-search").value.trim().toLowerCase();
+        if (q) {
+          const lastLine = logsEl.lastElementChild;
+          if (!lastLine.textContent.toLowerCase().includes(q)) {
+            lastLine.classList.add("search-hidden");
+          } else {
+            _highlightSearchInLine(lastLine, q);
+          }
+        }
+        logsEl.scrollTop = logsEl.scrollHeight;
+      }
+    });
+
+    // Live screenshot streaming — add to timeline + update driver monitor
+    socket.on("case_screenshot", ({ case_id, driver_id, image, file, ts }) => {
+      // Update case log timeline if open
+      if (activeCaseLog && case_id === activeCaseLog && file) {
+        _addTimelineThumb({ file, ts });
+        _showPreview({ file, ts });
+      }
+
+      // Update driver monitor card
+      _updateDriverCard(driver_id, case_id, image, ts);
+    });
+
+    // Close button
+    document.getElementById("clo-close").addEventListener("click", closeCaseLog);
+
+    // ESC to close
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape" && activeCaseLog) {
+        closeCaseLog();
+        e.stopPropagation();
+      }
+    });
+
+    // Ctrl+F inside overlay
+    document.addEventListener("keydown", e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "f" && activeCaseLog) {
+        e.preventDefault();
+        e.stopPropagation();
+        document.getElementById("clo-search").focus();
+      }
+    }, true);
+
+    // Search filtering
+    document.getElementById("clo-search").addEventListener("input", function () {
+      const q = this.value.trim().toLowerCase();
+      const logsEl = document.getElementById("clo-logs");
+      const lines = logsEl.querySelectorAll(".log-line");
+      let matchCount = 0;
+
+      lines.forEach(line => {
+        line.classList.remove("search-hidden");
+        if (line._originalText !== undefined) {
+          line.textContent = line._originalText;
+        }
+        if (!q) return;
+        const text = line.textContent;
+        line._originalText = text;
+        if (!text.toLowerCase().includes(q)) {
+          line.classList.add("search-hidden");
+        } else {
+          matchCount++;
+          _highlightSearchInLine(line, q);
+        }
+      });
+
+      const countEl = document.getElementById("clo-search-count");
+      countEl.textContent = q ? `${matchCount} match${matchCount !== 1 ? 'es' : ''}` : "";
+    });
+
+    function _highlightSearchInLine(lineEl, query) {
+      const text = lineEl.textContent;
+      const lower = text.toLowerCase();
+      let result = '';
+      let lastIdx = 0;
+      let idx;
+      while ((idx = lower.indexOf(query, lastIdx)) !== -1) {
+        result += _escHtml(text.substring(lastIdx, idx));
+        result += `<span class="search-match">${_escHtml(text.substring(idx, idx + query.length))}</span>`;
+        lastIdx = idx + query.length;
+      }
+      result += _escHtml(text.substring(lastIdx));
+      lineEl.innerHTML = result;
+    }
+
+    function _escHtml(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // Preview click for fullscreen expand
+    document.getElementById("clo-preview").addEventListener("click", function () {
+      const fs = document.createElement("div");
+      fs.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:400;
+        display:flex;align-items:center;justify-content:center;cursor:pointer`;
+      const img = document.createElement("img");
+      img.src = this.src;
+      img.style.cssText = "max-width:95vw;max-height:95vh;object-fit:contain";
+      fs.appendChild(img);
+      fs.addEventListener("click", () => fs.remove());
+      document.body.appendChild(fs);
+    });
+
+    /* ════════════════════════════════════════════════════════════════════════════
+       DRIVER MONITOR
+       ════════════════════════════════════════════════════════════════════════════ */
+    const _driverCards = {};  // driver_id → DOM card element
+
+    function _updateDriverCard(driverId, caseId, b64Image, ts) {
+      const container = document.getElementById("driver-monitor-body");
+      let card = _driverCards[driverId];
+
+      if (!card) {
+        card = document.createElement("div");
+        card.className = "driver-card";
+        card.innerHTML = `
+          <img src="" />
+          <div class="driver-card-info">
+            <div class="dc-case"></div>
+            <div class="dc-time"></div>
+          </div>
+        `;
+        card.querySelector("img").addEventListener("click", function () {
+          const fs = document.createElement("div");
+          fs.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:400;display:flex;align-items:center;justify-content:center;cursor:pointer";
+          const img = document.createElement("img");
+          img.src = this.src;
+          img.style.cssText = "max-width:95vw;max-height:95vh;object-fit:contain";
+          fs.appendChild(img);
+          fs.addEventListener("click", () => fs.remove());
+          document.body.appendChild(fs);
+        });
+        container.appendChild(card);
+        _driverCards[driverId] = card;
+      }
+
+      card.querySelector("img").src = `data:image/jpeg;base64,${b64Image}`;
+      card.querySelector(".dc-case").textContent = caseId || "Unknown";
+      card.querySelector(".dc-time").textContent = new Date(ts * 1000).toLocaleTimeString();
+    }
+
+
+    /* ════════════════════════════════════════════════════════════════════════════
+       PER-TASK / PER-NODE MULTI-PROVIDER AI & COST TRACKING LOGIC
+       ════════════════════════════════════════════════════════════════════════════ */
+
+    function formatCost(usd) {
+      const n = Number(usd) || 0;
+      if (n === 0) return "$0.0000";
+      return "$" + n.toFixed(4);
+    }
+
+    function shortenModelName(model) {
+      if (!model) return "default";
+      const parts = model.split("/");
+      let base = parts[parts.length - 1];
+      if (base.includes("claude-haiku-4-5")) return "haiku-4.5";
+      if (base.includes("claude-3-5-haiku")) return "haiku-3.5";
+      if (base.includes("claude-3-7-sonnet")) return "sonnet-3.7";
+      return base.replace(/-2024[0-9]{4}/, "").replace(/-2025[0-9]{4}/, "");
+    }
+
+    function updateCostBadges(summary) {
+      if (!summary) return;
+      const totalCostStr = formatCost(summary.total_cost_usd);
+
+      // Toolbar and Pipeline Header total badges
+      const tbCost = document.getElementById("tb-cost-val");
+      if (tbCost) tbCost.textContent = totalCostStr;
+
+      const pipeBadge = document.getElementById("pipe-total-cost-badge");
+      if (pipeBadge) pipeBadge.textContent = `AI Cost: ${totalCostStr}`;
+
+      const byTask = summary.by_task || {};
+
+      // Court Download cost badge (complaint + judgment + bankruptcy)
+      const courtCost = (byTask.complaint?.cost_usd || 0) +
+        (byTask.judgment?.cost_usd || 0) +
+        (byTask.bankruptcy?.cost_usd || 0);
+      const courtBadge = document.getElementById("cost-badge-court");
+      if (courtBadge) courtBadge.textContent = formatCost(courtCost);
+
+      // Obituary cost badge
+      const obitBadge = document.getElementById("cost-badge-obituary");
+      if (obitBadge) obitBadge.textContent = formatCost(byTask.obituary?.cost_usd || 0);
+
+      // Deed cost badge
+      const deedBadge = document.getElementById("cost-badge-deed");
+      if (deedBadge) deedBadge.textContent = formatCost(byTask.deed?.cost_usd || 0);
+    }
+
+    function updateNodeAiBadges() {
+      const cfg = currentLlmConfigs || {};
+
+      // Court Download sub-chips
+      const chipComp = document.getElementById("chip-complaint");
+      if (chipComp && cfg.complaint) {
+        const m = shortenModelName(cfg.complaint.model);
+        chipComp.textContent = `📄 ${m}`;
+        chipComp.title = `Complaint: ${cfg.complaint.service} / ${cfg.complaint.model || "default"}`;
+      }
+
+      const chipJudg = document.getElementById("chip-judgment");
+      if (chipJudg && cfg.judgment) {
+        const m = shortenModelName(cfg.judgment.model);
+        chipJudg.textContent = `⚖️ ${m}`;
+        chipJudg.title = `Judgment: ${cfg.judgment.service} / ${cfg.judgment.model || "default"}`;
+      }
+
+      const chipBank = document.getElementById("chip-bankruptcy");
+      if (chipBank && cfg.bankruptcy) {
+        const m = shortenModelName(cfg.bankruptcy.model);
+        chipBank.textContent = `🏛️ ${m}`;
+        chipBank.title = `Bankruptcy: ${cfg.bankruptcy.service} / ${cfg.bankruptcy.model || "default"}`;
+      }
+
+      // Obituary chip
+      const chipObit = document.getElementById("chip-obituary");
+      if (chipObit && cfg.obituary) {
+        const m = shortenModelName(cfg.obituary.model);
+        chipObit.textContent = `🕊️ ${m}`;
+        chipObit.title = `Obituary: ${cfg.obituary.service} / ${cfg.obituary.model || "default"}`;
+      }
+
+      // Deed chip
+      const chipDeed = document.getElementById("chip-deed");
+      if (chipDeed && cfg.deed) {
+        const m = shortenModelName(cfg.deed.model);
+        chipDeed.textContent = `📜 ${m}`;
+        chipDeed.title = `Deed: ${cfg.deed.service} / ${cfg.deed.model || "default"}`;
+      }
+
+      // Salesweb chip
+      const chipSalesweb = document.getElementById("chip-salesweb");
+      if (chipSalesweb && cfg.salesweb) {
+        const m = shortenModelName(cfg.salesweb.model);
+        chipSalesweb.textContent = `🏠 ${m}`;
+        chipSalesweb.title = `Salesweb Address+Finance: ${cfg.salesweb.service} / ${cfg.salesweb.model || "default"}`;
+      }
+    }
+
+    function openNodeConfigModal(type) {
+      activeNodeModalType = type || "court";
+      const modal = document.getElementById("n8n-node-config-modal");
+      const subtasksDiv = document.getElementById("node-modal-subtasks");
+      const iconEl = document.getElementById("node-modal-icon");
+      const titleEl = document.getElementById("node-modal-title");
+      const subEl = document.getElementById("node-modal-subtitle");
+      const tabsContainer = subtasksDiv ? subtasksDiv.querySelector(".node-sub-tabs") : null;
+
+      if (type === "court") {
+        iconEl.textContent = "📥";
+        titleEl.textContent = "Court Download AI Configuration";
+        subEl.textContent = "Configure separate AI models for Complaint, Judgment, and Bankruptcy files";
+        if (subtasksDiv) subtasksDiv.style.display = "block";
+        // Restore court tabs
+        if (tabsContainer) {
+          tabsContainer.innerHTML = `
+            <button class="node-sub-tab active" data-task="complaint" onclick="switchNodeTaskTab('complaint')">📄 Complaint</button>
+            <button class="node-sub-tab" data-task="judgment" onclick="switchNodeTaskTab('judgment')">⚖️ Final Judgment</button>
+            <button class="node-sub-tab" data-task="bankruptcy" onclick="switchNodeTaskTab('bankruptcy')">🏛️ Bankruptcy</button>
+          `;
+        }
+        switchNodeTaskTab("complaint");
+      } else if (type === "obituary") {
+        iconEl.textContent = "🕊️";
+        titleEl.textContent = "Obituary Search AI Configuration";
+        subEl.textContent = "Configure AI model and key for obituary name extraction and match scoring";
+        if (subtasksDiv) subtasksDiv.style.display = "none";
+        switchNodeTaskTab("obituary");
+      } else if (type === "deed") {
+        iconEl.textContent = "📜";
+        titleEl.textContent = "Deed Search AI Configuration";
+        subEl.textContent = "Configure AI models for county deed document search and salesweb address matching";
+        if (subtasksDiv) subtasksDiv.style.display = "block";
+        // Inject deed + salesweb tabs
+        if (tabsContainer) {
+          tabsContainer.innerHTML = `
+            <button class="node-sub-tab active" data-task="deed" onclick="switchNodeTaskTab('deed')">📜 Deed Documents</button>
+            <button class="node-sub-tab" data-task="salesweb" onclick="switchNodeTaskTab('salesweb')">🏠 Salesweb AI</button>
+          `;
+        }
+        switchNodeTaskTab("deed");
+      }
+
+      modal.classList.add("open");
+    }
+
+    function closeNodeConfigModal() {
+      const modal = document.getElementById("n8n-node-config-modal");
+      if (modal) modal.classList.remove("open");
+    }
+
+    function switchNodeTaskTab(task) {
+      activeNodeModalTask = task;
+
+      // Update active tab buttons
+      document.querySelectorAll(".node-sub-tab").forEach(tab => {
+        if (tab.getAttribute("data-task") === task) {
+          tab.classList.add("active");
+        } else {
+          tab.classList.remove("active");
+        }
+      });
+
+      // Load config for task
+      const cfg = (currentLlmConfigs && currentLlmConfigs[task]) || {
+        service: "anthropic",
+        model: "claude-haiku-4-5-20251001",
+        api_key: "ANTHROPIC_DEFAULT_KEY"
+      };
+
+      const svcSelect = document.getElementById("nm-service");
+      if (svcSelect) svcSelect.value = cfg.service || "anthropic";
+
+      const modelInput = document.getElementById("nm-model");
+      if (modelInput) modelInput.value = cfg.model || "";
+
+      const keyInput = document.getElementById("nm-api-key");
+      if (keyInput) keyInput.value = cfg.api_key || "";
+
+      renderModelQuickChips(cfg.service || "anthropic");
+
+      // Update hint text for the active task
+      const TASK_HINTS = {
+        complaint: "Extracts mortgage amount, property address, and plaintiff info from Complaint PDFs.",
+        judgment: "Reads Final Judgment PDFs to extract awarded amounts and sale dates.",
+        bankruptcy: "Identifies bankruptcy filings and automatic stay status from court documents.",
+        deed: "Searches county deed records for property ownership history and book/page references.",
+        obituary: "Finds and scores obituary matches for deceased defendants by name and location.",
+        salesweb: "🏠 Salesweb AI: matches the scraped sheriff-sale listing address against the target property address, and extracts financial obligations (upset price, judgment amount, etc.) from the listing's raw text."
+      };
+      const hintEl = document.getElementById("nm-hint-text");
+      if (hintEl && TASK_HINTS[task]) hintEl.textContent = TASK_HINTS[task];
+    }
+
+    function onModalServiceChange() {
+      const svc = document.getElementById("nm-service").value;
+      renderModelQuickChips(svc);
+      const presets = PROVIDER_MODEL_PRESETS[svc] || [];
+      if (presets.length > 0) {
+        document.getElementById("nm-model").value = presets[0];
+      }
+    }
+
+    function renderModelQuickChips(service) {
+      const container = document.getElementById("nm-quick-chips");
+      if (!container) return;
+      container.innerHTML = "";
+      const presets = PROVIDER_MODEL_PRESETS[service] || [];
+      presets.forEach(model => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "quick-chip";
+        chip.textContent = model;
+        chip.onclick = () => {
+          document.getElementById("nm-model").value = model;
+        };
+        container.appendChild(chip);
+      });
+    }
+
+    function toggleModalKeyVisibility() {
+      const inp = document.getElementById("nm-api-key");
+      if (inp) {
+        inp.type = inp.type === "password" ? "text" : "password";
+      }
+    }
+
+    async function saveNodeConfigFromModal() {
+      const task = activeNodeModalTask;
+      const service = document.getElementById("nm-service").value;
+      const model = document.getElementById("nm-model").value.trim();
+      const apiKey = document.getElementById("nm-api-key").value.trim();
+
+      if (!currentLlmConfigs) currentLlmConfigs = {};
+      currentLlmConfigs[task] = {
+        service: service,
+        model: model,
+        api_key: apiKey
+      };
+
+      try {
+        const r = await api("POST", "/api/settings", {
+          llm_configs: currentLlmConfigs
+        });
+        if (r.ok) {
+          toast(`Saved AI parameters for ${TASK_META[task]?.name || task}`, "success");
+          updateNodeAiBadges();
+          closeNodeConfigModal();
+        } else {
+          toast(r.error || "Failed to save AI configuration", "error");
+        }
+      } catch (err) {
+        toast("Error saving AI parameters: " + err.message, "error");
+      }
+    }
+
+    async function openCostBreakdownModal(focusTask) {
+      try {
+        const r = await api("GET", "/api/llm-costs");
+        if (r && r.summary) {
+          currentLlmCosts = r.summary;
+          updateCostBadges(r.summary);
+        }
+      } catch (e) {
+        console.warn("Failed fetching live LLM costs:", e);
+      }
+
+      renderCostBreakdownTable(focusTask);
+      const modal = document.getElementById("ai-cost-breakdown-modal");
+      if (modal) modal.classList.add("open");
+    }
+
+    function closeCostBreakdownModal() {
+      const modal = document.getElementById("ai-cost-breakdown-modal");
+      if (modal) modal.classList.remove("open");
+    }
+
+    function renderCostBreakdownTable(focusTask) {
+      const summary = currentLlmCosts || {
+        total_cost_usd: 0,
+        total_calls: 0,
+        total_prompt_tokens: 0,
+        total_completion_tokens: 0,
+        by_task: {}
+      };
+
+      // KPI cards
+      const kpiCost = document.getElementById("kpi-total-cost");
+      if (kpiCost) kpiCost.textContent = formatCost(summary.total_cost_usd);
+
+      const kpiCalls = document.getElementById("kpi-total-calls");
+      if (kpiCalls) kpiCalls.textContent = (summary.total_calls || 0).toLocaleString();
+
+      const kpiPrompt = document.getElementById("kpi-prompt-tokens");
+      if (kpiPrompt) kpiPrompt.textContent = (summary.total_prompt_tokens || 0).toLocaleString();
+
+      const kpiComp = document.getElementById("kpi-completion-tokens");
+      if (kpiComp) kpiComp.textContent = (summary.total_completion_tokens || 0).toLocaleString();
+
+      // Table rows
+      const tbody = document.getElementById("cost-table-tbody");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+
+      const tasks = ["complaint", "judgment", "bankruptcy", "deed", "obituary"];
+      const byTask = summary.by_task || {};
+      const configs = currentLlmConfigs || {};
+
+      tasks.forEach(key => {
+        const meta = TASK_META[key] || { name: key, icon: "⚡" };
+        const stat = byTask[key] || { calls: 0, prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, cost_usd: 0 };
+        const cfg = configs[key] || { service: "google", model: "gemini-2.5-flash" };
+
+        const tr = document.createElement("tr");
+        if (focusTask && (focusTask === key || (focusTask === "court" && meta.node === "court"))) {
+          tr.style.background = "rgba(0, 212, 170, 0.08)";
+        }
+
+        tr.innerHTML = `
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span>${meta.icon}</span>
+              <strong>${meta.name}</strong>
+            </div>
+            <div style="font-size:10px;color:var(--text-dim)">${key}</div>
+          </td>
+          <td>
+            <span style="font-family:var(--mono);font-size:11px;color:var(--accent)">${cfg.service || "default"}</span>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">${cfg.model || "default"}</div>
+          </td>
+          <td style="text-align:right">${(stat.calls || 0).toLocaleString()}</td>
+          <td style="text-align:right">${(stat.prompt_tokens || 0).toLocaleString()}</td>
+          <td style="text-align:right">${(stat.completion_tokens || 0).toLocaleString()}</td>
+          <td style="text-align:right">${(stat.total_tokens || 0).toLocaleString()}</td>
+          <td style="text-align:right;font-weight:700;color:${stat.cost_usd > 0 ? 'var(--accent)' : 'inherit'}">
+            ${formatCost(stat.cost_usd)}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Footer totals
+      const ftCalls = document.getElementById("ft-calls");
+      if (ftCalls) ftCalls.textContent = (summary.total_calls || 0).toLocaleString();
+
+      const ftPrompt = document.getElementById("ft-prompt");
+      if (ftPrompt) ftPrompt.textContent = (summary.total_prompt_tokens || 0).toLocaleString();
+
+      const ftComp = document.getElementById("ft-comp");
+      if (ftComp) ftComp.textContent = (summary.total_completion_tokens || 0).toLocaleString();
+
+      const totalTokens = (summary.total_prompt_tokens || 0) + (summary.total_completion_tokens || 0);
+      const ftTokens = document.getElementById("ft-tokens");
+      if (ftTokens) ftTokens.textContent = totalTokens.toLocaleString();
+
+      const ftCost = document.getElementById("ft-cost");
+      if (ftCost) ftCost.textContent = formatCost(summary.total_cost_usd);
+    }
+
+    async function resetAllLlmCosts() {
+      if (!confirm("⚠️ This will reset all accumulated LLM usage counters and costs back to $0.00.\n\nContinue?")) {
+        return;
+      }
+      try {
+        const r = await api("POST", "/api/llm-costs/reset");
+        if (r.ok) {
+          currentLlmCosts = r.costs;
+          updateCostBadges(r.costs);
+          renderCostBreakdownTable();
+          toast("LLM cost metrics reset successfully", "success");
+        } else {
+          toast(r.error || "Failed to reset LLM costs", "error");
+        }
+      } catch (err) {
+        toast("Error resetting LLM costs: " + err.message, "error");
+      }
+    }
+
+    // Connect Toolbar & Pipeline buttons and modal close listeners
+    document.addEventListener("DOMContentLoaded", () => {
+      const btnCost = document.getElementById("btn-cost-analytics");
+      if (btnCost) btnCost.addEventListener("click", () => openCostBreakdownModal());
+
+      const btnPipeCost = document.getElementById("btn-pipeline-cost-breakdown");
+      if (btnPipeCost) btnPipeCost.addEventListener("click", () => openCostBreakdownModal());
+
+      const btnCloseCost = document.getElementById("btn-close-cost-modal");
+      if (btnCloseCost) btnCloseCost.addEventListener("click", closeCostBreakdownModal);
+
+      const btnCloseNode = document.getElementById("btn-close-node-modal");
+      if (btnCloseNode) btnCloseNode.addEventListener("click", closeNodeConfigModal);
+
+      const btnCancelNode = document.getElementById("btn-cancel-node-modal");
+      if (btnCancelNode) btnCancelNode.addEventListener("click", closeNodeConfigModal);
+
+      // Close modals on overlay backdrop click
+      ["n8n-node-config-modal", "ai-cost-breakdown-modal"].forEach(id => {
+        const overlay = document.getElementById(id);
+        if (overlay) {
+          overlay.addEventListener("click", (e) => {
+            if (e.target === overlay) overlay.classList.remove("open");
+          });
+        }
+      });
+    });
+
+  </script>
+  <!-- ── CHANGES MODAL ─────────────────────────────────────────────────────── -->
+  <div class="modal-backdrop" id="modal-changes">
+    <div class="modal" style="width:540px">
+      <div class="modal-header">
+        <span id="changes-modal-title">📝 File Changes</span>
+        <button class="modal-close" data-close="modal-changes">✕</button>
+      </div>
+      <div class="modal-body" style="max-height:60vh;overflow-y:auto;padding:0">
+        <div id="changes-new-section" style="padding:16px 20px;border-bottom:1px solid var(--border)">
+          <div style="font-family:var(--sans);font-size:10px;font-weight:600;letter-spacing:1px;
+          text-transform:uppercase;color:var(--success);margin-bottom:10px">
+            ✅ New Files
+          </div>
+          <div id="changes-new-list" style="display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+        <div id="changes-removed-section" style="padding:16px 20px">
+          <div style="font-family:var(--sans);font-size:10px;font-weight:600;letter-spacing:1px;
+          text-transform:uppercase;color:var(--danger);margin-bottom:10px">
+            ❌ Removed Files
+          </div>
+          <div id="changes-removed-list" style="display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-close="modal-changes">Close</button>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

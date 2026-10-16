@@ -1,0 +1,18 @@
+# Start from an official Python image (this IS your "Python environment")
+FROM python:3.12-slim
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy and install dependencies FIRST (Docker caches this layer)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of your project
+COPY . .
+
+# Create the output folder
+RUN mkdir -p output
+
+# Default command when someone runs the container
+CMD ["python", "run.py", "--state", "NJ", "--status", "open"]

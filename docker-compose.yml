@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  court-scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: court_scraper
+    restart: unless-stopped
+    # CRITICAL: Allocates 2GB shared memory to prevent Chrome tabs from crashing
+    shm_size: '2gb'
+    ports:
+      - "5511:5511"
+    env_file:
+      - .env
+    volumes:
+      # Mount output, download, and upload directories for host persistence
+      - ./output:/app/output
+      - ./deed_output:/app/deed_output
+      - ./downloads:/app/downloads
+      - ./uploads:/app/uploads
+      - ./state.json:/app/state.json

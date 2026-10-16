@@ -1,0 +1,7 @@
+services:
+  scraper:
+    build: .
+    env_file: .env          
+    volumes:
+      - ./output:/app/output 
+    command: python run.py --state NJ --status open
