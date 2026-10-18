@@ -396,3 +396,87 @@ Court-Scraper/
 ```
 
 ---
+
+
+---
+
+## 🎬 The Program in Action & Input Guide
+
+### 1. The Program in Action
+
+When you launch the system (`python main.py` or through Docker), it starts a real-time web dashboard at **`http://localhost:5511`**.
+
+Instead of staring at a silent terminal, you get full live visibility into what every browser worker is doing:
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│  🏛️ COURT SCRAPER CONTROL CENTER                          [Workers: 2] [Status: RUNNING]        │
+├──────────────────────────────────────────────────────────────────────────────────────────────────┤
+│  Batch: palm_beach_cases.xlsx   | Total: 25 Cases | Completed: 14 | Failed: 0 | Remaining: 11    │
+│  Progress: [██████████████████████████░░░░░░░░░░░░░░░░░░] 56%                                     │
+├──────────────────────────────────────────────────────────────────────────────────────────────────┤
+│  CASE DOCKET        COUNTY         PROPERTY ADDRESS          STATUS           CURRENT STEP       │
+│  ─────────────────  ─────────────  ────────────────────────  ───────────────  ─────────────────  │
+│  50-2023-CA-004121  Palm Beach, FL 108 Ocean Dr, Boca Raton  [COMPLETED]      Synced to Supabase │
+│  F-014220-24        Essex, NJ      42 Elm St, Newark         [DOWNLOADING]    Doc 2/3 (Judgment) │
+│  CACE-23-018942     Broward, FL    225 Sunset Blvd, Ft Laud  [AI PARSING]     Groq 70B Extract   │
+│  2023-CA-001234-O   Orange, FL     780 Pine Ave, Orlando     [DEED SEARCH]    In WAL Queue (pos 2│
+│  F-009841-24        Bergen, NJ     15 Maple Ave, Hackensack  [PRE-CHECKING]   SalesWeb Auction   │
+│  50-2024-CA-001190  Palm Beach, FL 540 Lake Ave, W Palm Bch  [PENDING]        Waiting in line    │
+├──────────────────────────────────────────────────────────────────────────────────────────────────┤
+│  LIVE LOGS & DRIVER SNOOP                                                                        │
+│  [18:42:01] Worker-1: Case 50-2023-CA-004121 Final Judgment parsed: $324,500 debt, Plaintiff BofA│
+│  [18:42:05] Worker-1: Owner verified deceased. Obituary found: 3 surviving heirs listed          │
+│  [18:42:10] Worker-2: Navigating to Essex County eCourts portal for docket F-014220-24...        │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Case Lifecycle Statuses
+Every case moves through clear, color-coded stages in the UI:
+- ⚪ **`PENDING`**: Waiting in the queue for an available browser worker.
+- 🔵 **`LOGGING IN`**: Browser authenticating into the county court portal.
+- 🟡 **`PRE-CHECKING`**: Checking SalesWeb sheriff auctions and Zillow Zestimates to filter out low-equity properties before heavy scraping.
+- 🟣 **`ENTERING DOCKET`**: Navigating to the case search page and loading the court docket.
+- 🟢 **`DOWNLOADING`**: Downloading targeted legal PDFs (Complaints, Lis Pendens, Final Judgments).
+- 🟠 **`AI PARSING`**: Running OCR and sending text to Groq / Claude to extract loan balances, judgment figures, and party names into structured JSON.
+- 🟤 **`DEED SEARCH`**: Queued into the background SQLite WAL queue for county recorder deed verification.
+- 🕊️ **`OBITUARY SEARCH`**: Querying death records and reading obituary text for surviving heirs and probate signals.
+- ✅ **`COMPLETED`**: Case data, debts, deeds, and obituary findings safely saved in Supabase.
+- ⚠️ **`SKIPPED`**: Case was closed/dismissed on docket, had no viable equity, or was already processed in a previous run.
+
+---
+
+### 2. Input Guide
+
+The system accepts two forms of input: **The Case Spreadsheet** (which properties to research) and **The Runtime Settings** (how to run the automation).
+
+#### A. The Case Input Spreadsheet (`.xlsx` or `.csv`)
+You can drag-and-drop this file directly onto the web dashboard or place it in the `uploads/` directory.
+
+| Column # | Column Name | Required? | Where It Is Used in the Pipeline | Example Value |
+|---|---|---|---|---|
+| **Column 1** | **Case Number / Docket** | **Required** | The primary search key. Entered into county court clerk search forms to locate the docket and find legal PDFs. If the number has formatting quirks or missing hyphens, the built-in AI normalizer cleans it up before searching. | `F-014220-24` (NJ)<br>`50-2023-CA-004121` (FL) |
+| **Column 2** | **County / Jurisdiction** | **Required** | Tells the pipeline which county adapter to activate, which court portal URL to hit, and which login and navigation rules to apply. | `New Jersey`, `Palm Beach`, `Broward`, `Miami-Dade`, `Orange` |
+| **Column 3** | **Property Address** | **Optional** | If provided, immediately triggers Zillow Zestimate lookups and SalesWeb auction checks *before* opening browser tabs. If left blank, the scraper extracts the address directly from the court Lis Pendens or Complaint PDF. | `42 Elm St, Newark, NJ 07102` |
+| **Column 4** | **SalesWeb County** | **Optional** | Used specifically for New Jersey cases. Targets the exact county dropdown on the SalesWeb sheriff auction site to pull upset bids, sale dates, and bank attorneys. Defaults to Column 2 if blank. | `Essex`, `Bergen`, `Monmouth` |
+| **Column 5** | **Status** | **Optional** | Used for resuming runs. If a row is marked as `Processed` or `Completed`, the scraper skips it automatically, saving time, proxy bandwidth, and AI tokens. | `Processed`, `Pending` |
+
+#### B. Runtime Settings (`settings.json` or Web UI Modal)
+Configurable through the **Settings Modal** on the dashboard or directly in `settings.json`:
+
+| Setting Key | Type | Required? | Where It Is Used & What It Does | Default Value |
+|---|---|---|---|---|
+| `input_file` | String | **Required** | File path to the `.xlsx` or `.csv` spreadsheet containing the list of cases to scrape. | `uploads/palm_beach.xlsx` |
+| `batch_name` | String | **Optional** | A human-readable label for the run. Used to name output folders, database batch tags, and exported Excel summaries. Defaults to the input filename. | `palm_beach` |
+| `output_folder` | String | **Optional** | Directory where downloaded PDFs, screenshots, and summary Excel files are saved. If empty, creates a timestamped folder automatically. | `""` (auto-created) |
+| `keywords` | String | **Optional** | Comma-separated list of document names. The regex scanner looks for these in court docket descriptions to decide which PDFs to download. | `Complaint, Final Judgment, Lis Pendens, Vacate, Additional Sums` |
+| `unwanted_keywords` | String | **Optional** | Document keywords to ignore. Prevents downloading administrative clutter like certificate of service or military affidavits. | `Proof of mailing, Military affidavit, Foreclosure judgment notice` |
+| `headless_mode` | Boolean | **Optional** | If `true`, runs Chrome in the background. If `false`, opens a visible Chrome window (useful for debugging). Inside Docker, always runs via virtual Xvfb display. | `false` |
+| `max_workers` | Integer | **Optional** | Number of browser instances running in parallel. Set to 1–4 depending on your CPU and RAM capacity. | `1` |
+| `skip_closed_cases` | Boolean | **Optional** | When enabled, immediately skips any case that the court portal marks as closed, dismissed, or settled. | `false` |
+| `skip_business` | Boolean | **Optional** | Filters out corporate or commercial debtors (e.g. LLCs, Inc.) so you only spend time on residential homeowner leads. | `false` |
+| `llm_service` | String | **Optional** | Which AI provider to use for parsing legal PDFs: `"anthropic"`, `"groq"`, or `"mistral"`. | `"anthropic"` |
+| `llm_api_key` | String | **Required for AI** | API key for the selected LLM provider. If omitted, documents are still downloaded and deeds are searched, but AI JSON parsing is skipped. | `"sk-ant-..."` |
+
+---
+
